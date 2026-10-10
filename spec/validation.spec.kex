@@ -1,0 +1,70 @@
+using Metro.Validation, only: [Changeset, rules, validates, inOrder, present, sized, decimal, moreThanZero, atMost, calendarDate, emailAddress, passing]
+
+let signup = rules do
+  validates("email", "Email", [present, emailAddress])
+  validates("password", "Password", [present, sized(10, 200)])
+end
+
+let loan = rules do
+  validates("name", "Name", [present])
+  validates("value", "Balance", [present, decimal(2, "1250000.50")])
+  validates("rate", "Interest rate", [decimal(2, "6.25"), atMost(100000, 2, "1000%")])
+  validates("quantity", "Shares", [decimal(4, "10.5"), moreThanZero(4)])
+  validates("startDate", "Start date", [calendarDate])
+  validates("endDate", "End date", [calendarDate])
+  validates("currency", "Currency", [passing("must be a three-letter code.") { |text| text.length == 3 }])
+  inOrder("startDate", "endDate", "The end date is before the start date.")
+end
+
+describe("Metro.Validation") do
+  it("finds nothing wrong with values that satisfy every rule") do
+    let changeset : Changeset = Metro.Validation.checked(signup, {"email": "ada@example.com", "password": "correct horse"})
+    Assert.truthy(changeset.valid?)
+    Assert.equal(changeset.errors, [])
+  end
+
+  it("reports problems by field, in declared order, in the field's own words") do
+    let changeset : Changeset = Metro.Validation.checked(signup, {"email": "ada", "password": "short"})
+    Assert.falsy(changeset.valid?)
+    Assert.equal(changeset.errors, [
+      ("email", "Email must be an address like you@example.com."),
+      ("password", "Password must be at least 10 characters.")
+    ])
+    Assert.equal(changeset.on("password"), ["Password must be at least 10 characters."])
+    Assert.equal(changeset.on("email").count, 1)
+    Assert.equal(changeset.messages.count, 2)
+  end
+
+  it("stops at a field's first failed check") do
+    let changeset : Changeset = Metro.Validation.checked(signup, {})
+    Assert.equal(changeset.errors, [("email", "Email is required."), ("password", "Password is required.")])
+  end
+
+  it("lets an optional field be empty, and checks it once it is not") do
+    let fine : Changeset = Metro.Validation.checked(loan, {"name": "Loan", "value": "1 250,5"})
+    Assert.equal(fine.errors, [])
+    let wrong : Changeset = Metro.Validation.checked(loan, {
+      "name": "Loan", "value": "12.345", "rate": "1500", "quantity": "0",
+      "startDate": "2026-02-30", "currency": "forint"
+    })
+    Assert.equal(wrong.errors, [
+      ("value", "Balance must be a number like 1250000.50."),
+      ("rate", "Interest rate cannot be more than 1000%."),
+      ("quantity", "Shares must be more than zero."),
+      ("startDate", "Start date must be a date like 2031-06-30."),
+      ("currency", "Currency must be a three-letter code.")
+    ])
+  end
+
+  it("compares two fields when both are given") do
+    let backwards : Changeset = Metro.Validation.checked(loan, {"name": "Loan", "value": "1", "startDate": "2030-01-01", "endDate": "2029-01-01"})
+    Assert.equal(backwards.errors, [("endDate", "The end date is before the start date.")])
+    let open : Changeset = Metro.Validation.checked(loan, {"name": "Loan", "value": "1", "startDate": "2030-01-01"})
+    Assert.equal(open.errors, [])
+  end
+
+  it("keeps only the fields a form is permitted to set") do
+    let sent = [("email", Just("a@b.co")), ("admin", Just("true")), ("flag", None)]
+    Assert.equal(Metro.Validation.permitted(sent, ["email", "password"]), {"email": "a@b.co"})
+  end
+end

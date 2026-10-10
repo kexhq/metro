@@ -1,0 +1,28 @@
+# The browser half of a live page, and the route that serves it.
+#
+# The script (live.js, beside this file) opens the WebSocket, turns clicks,
+# typing and form submissions into events, and patches the markup the server
+# sends back into the page. A page opts in with three things:
+#
+#   <main id="app">…the live region…</main>           what gets patched
+#   <span id="status" data-state="connecting"></span>  where the connection state shows
+#   <script src="/metro/live.js"></script>
+#
+# and the server answers the WebSocket at `/live` with `Metro.Live.Socket`.
+module Metro.Live.Client
+
+using Rodolfo
+
+# Where the script is served.
+let PATH = "/metro/live.js"
+
+# The script itself, embedded in the program when it is built: an application
+# has no file to copy into its own public/ folder.
+script : String
+let script = Kex.embed("live.js")
+
+# The route to put in a router: `Metro.Live.Client.route()`.
+route : Rodolfo.Entry
+let route = get PATH do
+  Response.Text { body: Metro.Live.Client.script, headers: Net.HTTP.Headers.empty.add("Content-Type", "text/javascript; charset=utf-8").or(Net.HTTP.Headers.empty) }
+end

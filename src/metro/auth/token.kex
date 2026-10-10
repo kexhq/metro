@@ -1,0 +1,12 @@
+# Session tokens: 256 random bits handed to the browser, of which the server
+# keeps only a SHA-256 digest — so a copy of the database is not a set of
+# working sessions.
+module Metro.Auth.Token
+
+# A new token, as 64 hex characters.
+fresh : String
+foul fresh = "${BEAM.binary.encode_hex(BEAM.crypto.strong_rand_bytes(32))}"
+
+# What is stored and looked up for a token.
+digest : String -> String
+let digest(token) = Digest.sha256(token)

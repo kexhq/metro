@@ -1,0 +1,65 @@
+# One live page's WebSocket, from open to close — the part of the live layer
+# that knows nothing about the application.
+#
+# A live view here is three things the application supplies: a starting
+# state, a function from (state, event) to the next state, and a function
+# from state to markup. `attached` runs them against a socket: render once,
+# then for every event the browser sends, step and render again.
+#
+# The wire is text both ways (src/metro/live/live.js is the other end):
+#
+#   browser → server   form-encoded fields, one of them `event`
+#   server → browser   "render\n" + markup for the live region
+#                      "stale"    another tab changed shared data; ask again
+module Metro.Live.Socket
+
+using Net.HTTP.WebSocket, only: [Connection, Message, Text, BinaryMessage, CloseMessage]
+using Metro.Live.Hub, only: [Hub]
+
+# The first line of a message that carries markup.
+let RENDER = "render"
+
+# The fields of one event message. Unreadable text is no fields at all.
+decoded : String -> [(String, String?)]
+let decoded(message) = URI.Form.parse(message).map { |form| form.entries }.or([])
+
+# One named field of an event; "" when it was not sent.
+field : [(String, String?)] -> String -> String
+let field(entries, name) do
+  match entries.find { |entry| match entry do (key, _) => key == name end } do
+    Just((_, Just(value))) => value
+    _ => ""
+  end
+end
+
+# Serves one connection until the browser goes away.
+#
+# @param socket [Connection] the upgraded connection
+# @param hub [Server<Hub>] the tabs to notify when shared data changes
+# @param group [String] which tabs share this one's data: a user id, say
+# @param state [S] what a freshly opened tab starts with
+# @param step [S -> [(String, String?)] -> (S, Bool)] applies one event: the
+#   next state, and whether data other tabs show was changed
+# @param render [S -> String] the live region's markup for a state
+foul attached(socket: Connection, hub: Server<Hub>, group: String, state: S, step: S -> [(String, String?)] -> (S, Bool), render: S -> String) -> Void do
+  let tab = "${BEAM.erlang.unique_integer([:positive])}"
+  hub.joined(tab, group, socket)
+  var current = state
+  socket.send(Text("${RENDER}\n${render(current)}"))
+  loop do
+    match socket.receiveMessage do
+      Ok(Text(message)) => do
+        let (following, changed?) = step(current, decoded(message))
+        current = following
+        socket.send(Text("${RENDER}\n${render(current)}"))
+        if changed?
+          hub.changed(tab, group)
+        end
+      end
+      Ok(CloseMessage(_, _)) => break
+      Ok(_) => Void
+      Error(_) => break
+    end
+  end
+  hub.left(tab)
+end

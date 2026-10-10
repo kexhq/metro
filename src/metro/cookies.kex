@@ -1,0 +1,37 @@
+# Reading the `Cookie` header and writing `Set-Cookie` values.
+module Metro.Cookies
+
+# One cookie out of a request's `Cookie` header.
+#
+# @example
+#   Metro.Cookies.read(Just("theme=dark; sid=abc"), "sid")   # => Just("abc")
+read : String? -> String -> String?
+let read(None, name) = None
+let read(Just(header), name) do
+  let pairs = header.split(";").map { |pair| pair.trim }
+  match pairs.find { |pair| pair.startsWith?("${name}=") } do
+    Just(pair) => Just(pair.drop(name.length + 1))
+    None => None
+  end
+end
+
+# A `Set-Cookie` value for a cookie scripts cannot read and other sites'
+# requests do not carry. `secure?` adds `Secure`, for a site served over
+# HTTPS; over plain HTTP a browser would refuse to store such a cookie.
+issued : String -> String -> Integer -> Bool -> String
+let issued(name, value, maxAge, secure?) do
+  let flags = secure? then "; Secure" else ""
+  "${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${flags}"
+end
+
+# A `Set-Cookie` value that makes the browser forget a cookie.
+cleared : String -> String
+let cleared(name) = "${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+
+# Whether a request with these `Origin` and `Host` headers came from a page
+# of this site. A request with no `Origin` is not from a browser page at all
+# and is let through; one whose origin names another host is not.
+sameOrigin? : String? -> String? -> Bool
+let sameOrigin?(None, host) = true
+let sameOrigin?(Just(origin), None) = false
+let sameOrigin?(Just(origin), Just(host)) = origin == "http://${host}" || origin == "https://${host}"

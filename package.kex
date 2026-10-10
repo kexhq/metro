@@ -1,0 +1,10 @@
+package "metro" do
+  version("0.1.0")
+  description("A Rails- and Phoenix-like web framework for Kex")
+  kex(">= 0.4.0-rc.1")
+
+  # Project commands, run as "tey NAME" and listed by "tey help":
+  # command("bench", run: "script/bench.kex", description: "Run the benchmarks")
+
+  tey("rodolfo", git: "https://github.com/kexhq/rodolfo", tag: "~> 0.2")
+end

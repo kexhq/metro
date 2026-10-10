@@ -1,0 +1,179 @@
+# Validations: what a form's fields must satisfy, declared once and checked
+# in one place — Rails' `validates` for the declaring, Ecto's changeset for
+# the result.
+#
+#   let rules = rules do
+#     validates("email", "Email", [present, emailAddress])
+#     validates("password", "Password", [present, sized(10, 200)])
+#     inOrder("startDate", "endDate", "The end date is before the start date.")
+#   end
+#
+#   let changeset = Metro.Validation.checked(rules, values)
+#   changeset.valid?           # => false
+#   changeset.errors           # => [("email", "Email is required."), …]
+#   changeset.on("email")      # => ["Email is required."]
+#
+# Values are the text a browser sent, by field name. A check says what is
+# wrong as the end of a sentence that starts with the field's label, so the
+# same check reads right on every field it is used for. Every check but
+# `present` passes an empty value: whether a field may be left out is
+# `present`'s business alone, as with Rails' `allow_blank`.
+module Metro.Validation
+
+# One thing a value must satisfy.
+type Check = Present
+  | Sized(Integer, Integer)
+  | Decimal(Integer, String)
+  | MoreThanZero(Integer)
+  | AtMost(Integer, Integer, String)
+  | CalendarDate
+  | EmailAddress
+  | Passing(String -> Bool, String)
+
+# One declaration in a rule list: checks on a field, or an order two fields
+# must be in.
+type Rule = Validates(String, String, [Check]) | InOrder(String, String, String)
+
+# What checking found: the values as given, and every problem as
+# (field name, message), in the order the rules were declared.
+record Changeset do
+  values : {String: String} = {}
+  errors : [(String, String)] = []
+end
+
+make Changeset do
+  valid? :> Bool
+  let valid? = @errors.empty?
+
+  # The messages for one field.
+  on :> String -> [String]
+  let on(name) = @errors.flatMap { |problem| match problem do (field, message) => field == name then [message] else [] end }
+
+  # Every message, without its field: for a list above a form.
+  messages :> [String]
+  let messages = @errors.map { |problem| match problem do (_, message) => message end }
+end
+
+# Collects rule declarations.
+rules : Block<[Rule]> -> [Rule]
+let rules(declared) = declared()
+
+# Declares the checks on one field.
+#
+# @param name [String] the field, as the form names it
+# @param label [String] what the field is called in a message
+# @param checks [[Check]] what its value must satisfy, checked in order
+validates : String -> String -> [Check] -> Rule
+let validates(name, label, checks) = Validates(name, label, checks)
+
+# Declares that one field's value must not sort after another's, when both
+# are given. ISO dates sort as text, which is what this is for.
+inOrder : String -> String -> String -> Rule
+let inOrder(earlier, later, message) = InOrder(earlier, later, message)
+
+# --- Checks -----------------------------------------------------------------
+
+# Must be given.
+let present = Present
+
+# Must be between `shortest` and `longest` characters.
+sized : Integer -> Integer -> Check
+let sized(shortest, longest) = Sized(shortest, longest)
+
+# Must be a non-negative decimal with at most `digits` decimal places.
+# `example` is a number that would do, for the message.
+decimal : Integer -> String -> Check
+let decimal(digits, example) = Decimal(digits, example)
+
+# Must not be zero, read as a decimal of `digits` places.
+moreThanZero : Integer -> Check
+let moreThanZero(digits) = MoreThanZero(digits)
+
+# Must not exceed `limit`, a decimal of `digits` places already scaled;
+# `shown` is the limit in words.
+atMost : Integer -> Integer -> String -> Check
+let atMost(limit, digits, shown) = AtMost(limit, digits, shown)
+
+# Must be a real calendar date, written 2031-06-30.
+let calendarDate = CalendarDate
+
+# Must look like an email address.
+let emailAddress = EmailAddress
+
+# Must pass a test of the application's own; `complaint` ends the sentence.
+passing : String -> (String -> Bool) -> Check
+let passing(complaint, test) = Passing(test, complaint)
+
+# --- Checking ---------------------------------------------------------------
+
+# Checks values against rules.
+checked : [Rule] -> {String: String} -> Changeset
+let checked(declared, values) = Changeset {
+  values: values,
+  errors: declared.flatMap { |rule| broken(rule, values) }
+}
+
+# Only the fields named, out of what a browser sent: a form may not set what
+# it was not asked for.
+permitted : [(String, String?)] -> [String] -> {String: String}
+let permitted(entries, names) do
+  entries.reduce({}) { |kept, entry|
+    match entry do
+      (name, Just(value)) => names.contains?(name) then kept.put(name, value) else kept
+      _ => kept
+    end
+  }
+end
+
+private do
+  given : {String: String} -> String -> String
+  let given(values, name) = values.get(name).or("").trim
+
+  # A rule's problems. A field stops at its first failed check: "is required"
+  # and "must be a number" under one input is noise.
+  broken : Rule -> {String: String} -> [(String, String)]
+  let broken(Validates(name, label, checks), values) do
+    let text = given(values, name)
+    let failures = checks.flatMap { |check|
+      match failure(check, text) do
+        Just(complaint) => ["${label} ${complaint}"]
+        None => []
+      end
+    }
+    failures.take(1).map { |message| (name, message) }
+  end
+  let broken(InOrder(earlier, later, message), values) do
+    let first = given(values, earlier)
+    let second = given(values, later)
+    first.empty? || second.empty? || first <= second then [] else [(later, message)]
+  end
+
+  # What is wrong with a value, as the end of a sentence, or nothing.
+  failure : Check -> String -> String?
+  let failure(Present, text) = text.empty? then Just("is required.") else None
+  let failure(check, "") = None
+  let failure(Sized(shortest, longest), text) do
+    return Just("must be at least ${shortest} characters.") if text.length < shortest
+    return Just("must be at most ${longest} characters.") if text.length > longest
+
+    None
+  end
+  let failure(Decimal(digits, example), text) do
+    let places = digits == 0 then "a whole number" else "a number"
+    Metro.Decimal.scaled(text, digits).set? then None else Just("must be ${places} like ${example}.")
+  end
+  let failure(MoreThanZero(digits), text) = Metro.Decimal.scaled(text, digits) == Just(0) then Just("must be more than zero.") else None
+  let failure(AtMost(limit, digits, shown), text) do
+    match Metro.Decimal.scaled(text, digits) do
+      Just(value) => value > limit then Just("cannot be more than ${shown}.") else None
+      None => None
+    end
+  end
+  let failure(CalendarDate, text) = Date.parse(text).ok? then None else Just("must be a date like 2031-06-30.")
+  let failure(EmailAddress, text) do
+    let parts = text.split("@")
+    let shaped = parts.count == 2 && !parts.first.or("").empty? && parts.last.or("").contains?(".") && !text.contains?(" ")
+    shaped && text.length <= 254 then None else Just("must be an address like you@example.com.")
+  end
+  let failure(Passing(test, complaint), text) = test(text) then None else Just(complaint)
+end

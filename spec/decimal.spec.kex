@@ -1,0 +1,33 @@
+using Metro.Decimal, only: [scaled, shown, typed]
+
+describe("Metro.Decimal") do
+  it("reads whole and decimal numbers") do
+    Assert.equal(scaled("1250", 2), Just(125000))
+    Assert.equal(scaled("1 250,5", 2), Just(125050))
+    Assert.equal(scaled("0.07", 2), Just(7))
+    Assert.equal(scaled("10.5", 4), Just(105000))
+  end
+
+  it("refuses what is not a non-negative decimal") do
+    Assert.equal(scaled("", 2), None)
+    Assert.equal(scaled("abc", 2), None)
+    Assert.equal(scaled("-5", 2), None)
+    Assert.equal(scaled("1.2.3", 2), None)
+    Assert.equal(scaled("12.345", 2), None)
+    Assert.equal(scaled(".5", 2), None)
+  end
+
+  it("shows grouped digits and every decimal place") do
+    Assert.equal(shown(125050, 2), "1 250.50")
+    Assert.equal(shown(7, 2), "0.07")
+    Assert.equal(shown(8000000000, 2), "80 000 000.00")
+    Assert.equal(shown(-125050, 2), "−1 250.50")
+  end
+
+  it("types a value back without grouping or trailing zeros") do
+    Assert.equal(typed(125050, 2), "1250.5")
+    Assert.equal(typed(100, 2), "1")
+    Assert.equal(typed(105000, 4), "10.5")
+    Assert.equal(typed(0, 2), "0")
+  end
+end

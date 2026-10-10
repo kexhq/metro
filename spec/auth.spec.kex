@@ -1,0 +1,54 @@
+describe("Metro.Auth.Password") do
+  it("matches the password it was made from, and no other") do
+    let stored = Metro.Auth.Password.hashed("correct horse battery")
+    Assert.truthy(Metro.Auth.Password.matches?("correct horse battery", stored))
+    Assert.falsy(Metro.Auth.Password.matches?("correct horse batterz", stored))
+    Assert.falsy(Metro.Auth.Password.matches?("", stored))
+  end
+
+  it("salts: the same password is stored differently each time") do
+    Assert.notEqual(Metro.Auth.Password.hashed("correct horse battery"), Metro.Auth.Password.hashed("correct horse battery"))
+  end
+
+  it("stores its scheme and work factor, and never the password") do
+    let stored = Metro.Auth.Password.hashed("correct horse battery")
+    Assert.truthy(stored.startsWith?("pbkdf2-sha256$600000$"))
+    Assert.falsy(stored.contains?("correct horse"))
+  end
+
+  it("matches nothing against a line that does not parse") do
+    Assert.falsy(Metro.Auth.Password.matches?("x", ""))
+    Assert.falsy(Metro.Auth.Password.matches?("x", "plain$0$00$00"))
+    Assert.falsy(Metro.Auth.Password.matches?("x", "pbkdf2-sha256$0$00$00"))
+  end
+end
+
+describe("Metro.Cookies") do
+  it("reads one cookie out of the header") do
+    Assert.equal(Metro.Cookies.read(Just("theme=dark; penz_session=abc123"), "penz_session"), Just("abc123"))
+    Assert.equal(Metro.Cookies.read(Just("xpenz_session=nope"), "penz_session"), None)
+    Assert.equal(Metro.Cookies.read(None, "penz_session"), None)
+  end
+
+  it("issues a cookie scripts cannot read and other sites do not send") do
+    Assert.equal(Metro.Cookies.issued("sid", "abc", 60, false), "sid=abc; Path=/; Max-Age=60; HttpOnly; SameSite=Lax")
+    Assert.truthy(Metro.Cookies.issued("sid", "abc", 60, true).endsWith?("; Secure"))
+  end
+
+  it("tells this site's pages from another's") do
+    Assert.truthy(Metro.Cookies.sameOrigin?(Just("http://localhost:4000"), Just("localhost:4000")))
+    Assert.truthy(Metro.Cookies.sameOrigin?(None, Just("localhost:4000")))
+    Assert.falsy(Metro.Cookies.sameOrigin?(Just("https://evil.example"), Just("localhost:4000")))
+    Assert.falsy(Metro.Cookies.sameOrigin?(Just("http://localhost:4000.evil.example"), Just("localhost:4000")))
+  end
+end
+
+describe("Metro.Auth.Token") do
+  it("is 256 random bits, and stored as a digest that is not the token") do
+    let token = Metro.Auth.Token.fresh()
+    Assert.equal(token.length, 64)
+    Assert.notEqual(token, Metro.Auth.Token.fresh())
+    Assert.notEqual(Metro.Auth.Token.digest(token), token)
+    Assert.equal(Metro.Auth.Token.digest(token), Metro.Auth.Token.digest(token))
+  end
+end

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "workspace": {"members": {"metro": "."}, "manifest_fingerprint": "f09fc5c90cd26a6fd2e9dd854e4883adc38b5ca38f6c6de1e8561c49441fd6c4"},
+  "toolchain": {"kex": "0.4.0", "kex_requirement": ">= 0.4.0-rc.1", "otp": 29, "otp_requirement": ""},
+  "packages": {
+    "metro": {"version": "0.1.0", "source": "workspace", "git": "", "resolved": "", "commit": "", "subdir": "", "path": ".", "sha256": "", "groups": [], "dependencies": ["rodolfo"], "plugins": {}, "workspace": true},
+    "rodolfo": {"version": "0.2.0", "source": "git", "git": "https://github.com/kexhq/rodolfo", "resolved": "v0.2.0", "commit": "7cf95a75bb3c7b57eddb4ad9e10d35fa08383eca", "subdir": ".", "path": "", "sha256": "f5c12e2983a12ed9a201360cd00873dad5629b992bcca8a1e527605e353a0bd8", "groups": [], "dependencies": [], "plugins": {}, "workspace": false}
+  },
+  "plugins": {"approvals": {}}
+}

@@ -1,0 +1,29 @@
+# Metro — a Rails- and Phoenix-like web framework for Kex.
+#
+# Pages are rendered on the server and kept live over a WebSocket; forms are
+# checked by declared validations; sign-in rests on hashed passwords and
+# server-side sessions.
+#
+#   Metro.Live.Socket    one live page's WebSocket: state, step, render
+#   Metro.Live.Hub       tells a user's other tabs their page is stale
+#   Metro.Live.Client    the browser script, and the route that serves it
+#   Metro.Validation     `validates(…)` rules, checked into a changeset
+#   Metro.Auth.Password  PBKDF2 password hashes
+#   Metro.Auth.Token     session tokens, stored as digests
+#   Metro.Cookies        reading and issuing cookies, same-origin test
+#   Metro.Plugs          the same-origin plug
+#   Metro.Decimal        decimals as scaled integers
+#
+# HTTP is Rodolfo's for now; it is used in `Metro.Plugs` and
+# `Metro.Live.Client` only.
+module Metro do
+  export Metro.Live.Socket
+  export Metro.Live.Hub
+  export Metro.Live.Client
+  export Metro.Validation
+  export Metro.Auth.Password
+  export Metro.Auth.Token
+  export Metro.Cookies
+  export Metro.Plugs
+  export Metro.Decimal
+end

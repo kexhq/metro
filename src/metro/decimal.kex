@@ -1,0 +1,80 @@
+# Decimal numbers as scaled integers.
+#
+# Kex has no `Decimal` yet, and a balance kept in a `Float64` loses cents. So
+# a decimal is an `Integer` scaled by a power of ten — 12.50 at two digits is
+# 1250 — read from and written back to the text a person types. What the
+# digits mean (money, a percentage, a quantity) is the application's business.
+module Metro.Decimal
+
+# Reads a non-negative decimal: "1 250 000", "1250000.5", "1.250.000,50" is
+# not accepted, but "1250000,50" is — a comma or a point is the decimal mark,
+# and spaces and underscores group digits.
+#
+# @param text [String] what was typed
+# @param digits [Integer] decimal places the result is scaled by
+# @return [Integer?] the scaled value, or `None` when it is not such a number
+#
+# @example
+#   Lib.Amount.scaled("1 250,5", 2)   # => Just(125050)
+#   Lib.Amount.scaled("12.345", 2)    # => None
+scaled : String -> Integer -> Integer?
+let scaled(text, digits) do
+  let cleaned = text.trim.replace(" ", "").replace("_", "").replace(",", ".")
+  match cleaned.split(".") do
+    [whole] => combined(whole, "", digits)
+    [whole, fraction] => combined(whole, fraction, digits)
+    _ => None
+  end
+end
+
+# A scaled value with digit grouping and every decimal place: 125050 at two
+# digits is "1 250.50".
+shown : Integer -> Integer -> String
+let shown(value, digits) do
+  let sign = value < 0 then "−" else ""
+  let size = value.abs
+  let whole = grouped("${size / unit(digits)}")
+  digits == 0 then "${sign}${whole}" else "${sign}${whole}.${fraction(size, digits)}"
+end
+
+# A scaled value the way a form field holds it: no grouping, and no trailing
+# zeros, so 125050 at two digits is "1250.5" and 100 is "1".
+typed : Integer -> Integer -> String
+let typed(value, digits) do
+  let size = value.abs
+  let sign = value < 0 then "-" else ""
+  let decimals = trimmed(fraction(size, digits))
+  let whole = "${size / unit(digits)}"
+  decimals.empty? then "${sign}${whole}" else "${sign}${whole}.${decimals}"
+end
+
+# Ten to the `digits`.
+unit : Integer -> Integer
+let unit(digits) = digits <= 0 then 1 else 10 * unit(digits - 1)
+
+private do
+  combined : String -> String -> Integer -> Integer?
+  let combined(whole, fraction, digits) do
+    let valid = !whole.empty? && digits?(whole) && digits?(fraction) && fraction.length <= digits
+    let padded = "${fraction}000000000000".take(digits)
+    valid then "${whole}${padded}".to(Integer) else None
+  end
+
+  digits? : String -> Bool
+  let digits?(text) = text.chars.all? { |char| char.digit? }
+
+  fraction : Integer -> Integer -> String
+  let fraction(size, digits) do
+    let padded = "000000000000${size.modulo(unit(digits))}"
+    padded.drop(padded.length - digits)
+  end
+
+  trimmed : String -> String
+  let trimmed(decimals) = decimals.endsWith?("0") then trimmed(decimals.take(decimals.length - 1)) else decimals
+
+  grouped : String -> String
+  let grouped(digits) do
+    let head = digits.length - 3
+    head <= 0 then digits else "${grouped(digits.take(head))} ${digits.drop(head)}"
+  end
+end

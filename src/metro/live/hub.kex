@@ -1,0 +1,41 @@
+# Every open tab's WebSocket, so a change made in one can tell the others
+# they are showing old numbers.
+#
+# The hub does not render for anyone: a tab's markup depends on its own
+# `Tab`, which only its own handler has. So the hub sends one word,
+# "stale", and the browser answers by asking its handler for a fresh render.
+module Metro.Live.Hub
+
+using Net.HTTP.WebSocket, only: [Connection, Text]
+
+# A tab's socket, and the group it belongs to: tabs showing the same data.
+record Seat do
+  group : String
+  socket : Connection
+end
+
+record Hub do
+  tabs : {String: Seat} = {}
+end
+
+# The whole message a tab is sent when another tab changed the holdings.
+let STALE = "stale"
+
+serving Hub do
+  slot joined(tab: String, group: String, socket: Connection) -> Void do
+    new.tabs = @tabs.put(tab, Seat { group: group, socket: socket })
+    return new
+  end
+
+  slot left(tab: String) -> Void do
+    new.tabs = @tabs.delete(tab)
+    return new
+  end
+
+  # Tells every other tab of `tab`'s group to refresh, forgetting any that
+  # have gone. Tabs of other groups hear nothing.
+  slot changed(tab: String, group: String) -> Void do
+    new.tabs = @tabs.filter { |name, seat| name == tab || seat.group != group || seat.socket.send(Text(STALE)).ok? }
+    return new
+  end
+end

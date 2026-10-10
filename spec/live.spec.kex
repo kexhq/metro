@@ -1,0 +1,16 @@
+describe("Metro.Live.Socket") do
+  it("reads an event's fields out of form-encoded text") do
+    let entries = Metro.Live.Socket.decoded("event=save&name=Home+mortgage&notes=")
+    Assert.equal(Metro.Live.Socket.field(entries, "event"), "save")
+    Assert.equal(Metro.Live.Socket.field(entries, "name"), "Home mortgage")
+    Assert.equal(Metro.Live.Socket.field(entries, "notes"), "")
+    Assert.equal(Metro.Live.Socket.field(entries, "missing"), "")
+  end
+end
+
+describe("Metro.Live.Client") do
+  it("carries the browser script inside the program") do
+    Assert.truthy(Metro.Live.Client.script.contains?("new WebSocket"))
+    Assert.truthy(Metro.Live.Client.script.contains?("patchChildren"))
+  end
+end

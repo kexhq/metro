@@ -1,0 +1,26 @@
+# Plugs every application wants.
+module Metro.Plugs
+
+using Rodolfo
+
+# Refuses a request that changes something and whose `Origin` is another
+# site: a form on someone else's page cannot post here. Put it on the whole
+# router — `plug(Metro.Plugs.sameOrigin)`.
+#
+# `ws` routes are outside Rodolfo's plug stack; ask `trusted?` from the
+# handler and close the socket on `false`.
+let sameOrigin = Plug.around do |inner, env|
+  if env.request.method == "GET" || env.request.method == "HEAD" || trusted?(env)
+    inner(env)
+  else
+    Response.Text { status: 403, body: "This request did not come from this site." }
+  end
+end
+
+# Whether a request came from one of this site's own pages.
+trusted? : Context -> Bool
+let trusted?(env) = Metro.Cookies.sameOrigin?(env.request.headers.get("Origin"), env.request.headers.get("Host"))
+
+# One cookie of a request.
+cookie : Context -> String -> String?
+let cookie(env, name) = Metro.Cookies.read(env.request.headers.get("Cookie"), name)
