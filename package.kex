@@ -4,8 +4,8 @@ package "metro" do
   kex(">= 0.4.0-rc.1")
 
   # Metro's generators, as a Tey plugin: `tey generate metro:app` from a
-  # package that depends on Metro. Tey reads this declaration and asks for
-  # approval on install, but has no `generate` command to run it with yet.
+  # package that depends on Metro. Tey asks for approval of the plugin when
+  # that package is installed.
   plugin namespace: "metro", tey: ">= 0.2" do
     capabilities([FS.Write.workspace])
 
@@ -16,7 +16,8 @@ package "metro" do
     end
   end
 
-  # The same generator, run directly, until Tey can run the plugin:
+  # The same generator in one step, for a Tey without `generate`, or to start
+  # an app without first making a package for it:
   #   tey new-app ../chat
   command("new-app", run: "generators/new.kex", description: "Create a new Metro application in a directory")
 

@@ -4,9 +4,6 @@
 # workspace and with its own confirmation rules.
 #
 #   tey generate metro:app --name chat
-#
-# Tey has no `generate` command yet (see the README); `generators/new.kex`
-# runs the same generator in the meantime.
 using JSON
 using Metro.Generators.App, only: [Sources]
 
@@ -46,8 +43,12 @@ main do
     metro: metro.empty? then defaults.metro else metro,
     harmat: harmat.empty? then defaults.harmat else harmat
   }
-  let operations = Metro.Generators.App.files(name, sources).map { |file|
+  let writes = Metro.Generators.App.files(name, sources).map { |file|
     match file do (path, content) => { kind: "write", path: path, content: content } end
   }
+  # `tey init` leaves a src/main.kex behind; a Metro app's entrypoint is at
+  # the root and `src` becomes a link to it (script/setup.sh), so the file
+  # has to go for the directory to be replaceable.
+  let operations = writes + [{ kind: "delete", path: "src/main.kex", content: "" }]
   IO.printLine(JSON.stringify({ version: 1, operations: operations }))
 end
