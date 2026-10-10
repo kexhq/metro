@@ -1,0 +1,21 @@
+package "__app__" do
+  version("0.1.0")
+  description("__App__")
+  kex(">= 0.4.0-rc.1")
+
+  # The entrypoint sits at the root so that app/, config/, db/ and lib/ are
+  # module roots (App.*, Config.*, DB.*, Lib.*). `src` is a symlink to this
+  # directory, made by script/setup.sh: Tey looks for modules in src/ and
+  # nowhere else, and without it `tey test` cannot find them.
+  entrypoint("main.kex")
+
+  command("server", run: "tey run server", description: "Migrate, then serve on http://localhost:4000")
+  command("migrate", run: "tey run migrate", description: "Run the migrations this database has not run")
+  command("rollback", run: "tey run rollback", description: "Undo the newest migration (or the newest N)")
+  command("odbc", run: "script/setup-odbc.sh db/odbc", description: "Build Erlang's ODBC port program into db/odbc, once")
+
+  # Rodolfo's main, not its 0.2.0 tag: publicFolder is newer than the tag.
+  tey("rodolfo", git: "__RODOLFO__", branch: "main")
+  tey("harmat", git: "__HARMAT__", branch: "__HARMAT_BRANCH__")
+  tey("metro", git: "__METRO__", branch: "__METRO_BRANCH__")
+end

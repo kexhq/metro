@@ -3,8 +3,25 @@ package "metro" do
   description("A Rails- and Phoenix-like web framework for Kex")
   kex(">= 0.4.0-rc.1")
 
-  # Project commands, run as "tey NAME" and listed by "tey help":
-  # command("bench", run: "script/bench.kex", description: "Run the benchmarks")
+  # Metro's generators, as a Tey plugin: `tey generate metro:app` from a
+  # package that depends on Metro. Tey reads this declaration and asks for
+  # approval on install, but has no `generate` command to run it with yet.
+  plugin namespace: "metro", tey: ">= 0.2" do
+    capabilities([FS.Write.workspace])
 
-  tey("rodolfo", git: "https://github.com/kexhq/rodolfo", tag: "~> 0.2")
+    generator("app", entrypoint: "generators/app.kex") do
+      option("name", type: String)
+      option("metro", type: String)
+      option("harmat", type: String)
+    end
+  end
+
+  # The same generator, run directly, until Tey can run the plugin:
+  #   tey new-app ../chat
+  command("new-app", run: "generators/new.kex", description: "Create a new Metro application in a directory")
+
+  # Rodolfo's main, not its 0.2.0 tag: publicFolder and plugs' current form
+  # are newer than the tag. Every package of an application has to ask for
+  # Rodolfo the same way, so generated apps say the same.
+  tey("rodolfo", git: "https://github.com/kexhq/rodolfo", branch: "main")
 end

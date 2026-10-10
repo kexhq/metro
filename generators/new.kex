@@ -1,0 +1,66 @@
+# Creates a new Metro application in a directory. A stand-in for
+# `tey generate metro:app`, which Tey cannot run yet: it calls the same
+# generator and does what Tey's plugin host would — writes each file, and
+# refuses to replace one that exists.
+#
+#   tey new-app ../chat                  # from a Metro checkout
+#   tey new-app ../chat --metro ../metro # dependencies from somewhere else
+using Metro.Generators.App, only: [Sources]
+
+# The value after a `--flag`, or "".
+let flag(args: [String], name: String) -> String do
+  match args.findIndex { |arg| arg == name } do
+    Just(index) => args.at(index + 1).or("")
+    None => ""
+  end
+end
+
+foul written(directory: String, file: (String, String)) -> Bool do
+  match file do
+    (path, content) => do
+      let target = FS.Path.join(directory, path)
+      if FS.File.exists?(target)
+        IO.printError("  skip  ${path} (exists)")
+        return false
+      end
+      FS.Directory.create(FS.Path.dirname(target))
+      FS.File.write(target, content)
+      IO.printLine("  write ${path}")
+      return true
+    end
+  end
+end
+
+main(args) do
+  let directory = args.first.or("")
+  if directory.empty? || directory.startsWith?("--")
+    IO.printError("usage: tey new-app <directory> [--name <app_name>] [--metro <git>] [--harmat <git>]")
+    System.exit(1)
+  end
+  let given = flag(args, "--name")
+  let name = given.empty? then FS.Path.basename(FS.Path.normalize(directory)) else given
+  if !Metro.Generators.App.valid?(name)
+    IO.printError("`${name}` cannot name an application; use lower-case letters, digits and underscores, starting with a letter (--name)")
+    System.exit(1)
+  end
+  let defaults = Sources {}
+  let metro = flag(args, "--metro")
+  let harmat = flag(args, "--harmat")
+  let sources = Sources {
+    ...defaults,
+    metro: metro.empty? then defaults.metro else metro,
+    harmat: harmat.empty? then defaults.harmat else harmat
+  }
+  IO.printLine("Creating ${Metro.Generators.App.titled(name)} in ${directory}")
+  FS.Directory.create(directory)
+  let files = Metro.Generators.App.files(name, sources)
+  let done = files.filter { |file| written(directory, file) }
+  ["script/setup.sh", "script/setup-odbc.sh"].each { |script| FS.File.changeMode(FS.Path.join(directory, script), 493) }
+  IO.printLine("${done.count} of ${files.count} files written.")
+  IO.printLine("")
+  IO.printLine("Next:")
+  IO.printLine("  cd ${directory}")
+  IO.printLine("  git init")
+  IO.printLine("  script/setup.sh")
+  IO.printLine("  tey server")
+end

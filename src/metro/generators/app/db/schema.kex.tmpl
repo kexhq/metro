@@ -1,0 +1,8 @@
+# Every table this application declares: what `Harmat.Table.drift` holds the
+# migrations against. One file each in db/schema.
+module DB.Schema
+
+using Harmat.Table, only: [Definition]
+
+tables : [Definition]
+let tables = [DB.Schema.Users.definition, DB.Schema.Sessions.definition]

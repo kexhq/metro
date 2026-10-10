@@ -1,0 +1,53 @@
+# The `metro:app` generator, as Tey's plugin host runs it: one line of JSON
+# on stdin (the invocation), one JSON document on stdout (the files to
+# write). It touches nothing itself; Tey applies the operations, inside the
+# workspace and with its own confirmation rules.
+#
+#   tey generate metro:app --name chat
+#
+# Tey has no `generate` command yet (see the README); `generators/new.kex`
+# runs the same generator in the meantime.
+using JSON
+using Metro.Generators.App, only: [Sources]
+
+# A string field of a JSON object, or "" when it is absent or not a string.
+let text(object: Any, key: String) -> String do
+  match object do
+    None => ""
+    _ => match object[key] do
+      Just(value) => "${value}"
+      None => ""
+    end
+  end
+end
+
+let member(object: Any, key: String) -> Any do
+  match object[key] do
+    Just(value) => value
+    None => None
+  end
+end
+
+main do
+  let invocation = JSON.parse(IO.getLine.or("")).or({})
+  let context = member(invocation, "context")
+  let options = member(context, "options")
+  let defaults = Sources {}
+  let given = text(options, "name")
+  let name = given.empty? then FS.Path.basename(text(context, "workspaceRoot")) else given
+  if !Metro.Generators.App.valid?(name)
+    IO.printError("metro:app: `${name}` cannot name an application; use lower-case letters, digits and underscores, starting with a letter (--name)")
+    System.exit(1)
+  end
+  let metro = text(options, "metro")
+  let harmat = text(options, "harmat")
+  let sources = Sources {
+    ...defaults,
+    metro: metro.empty? then defaults.metro else metro,
+    harmat: harmat.empty? then defaults.harmat else harmat
+  }
+  let operations = Metro.Generators.App.files(name, sources).map { |file|
+    match file do (path, content) => { kind: "write", path: path, content: content } end
+  }
+  IO.printLine(JSON.stringify({ version: 1, operations: operations }))
+end

@@ -1,0 +1,27 @@
+# The home page as a live view: what each browser event does to a tab's
+# state, and the markup that results. `Metro.Live.Socket` runs these two
+# functions against a WebSocket (config/routes.kex).
+#
+# This is the place to start: add an event below, a button with
+# `data-event="…"` in app/views/home/index.html.ket, and the page is live.
+module App.Live.Home
+
+using App.Live.Tab, only: [Tab]
+using App.Models.User, only: [User]
+using Metro.Live.Socket, only: [field]
+
+# The live region for one user's tab.
+markup : User -> Tab -> String
+let markup(user, tab) = App.Views.Home.index(user.email, tab)
+
+# Applies one event: the tab's next state, and whether data other tabs show
+# was changed — in which case they are told to refresh.
+handled : Tab -> [(String, String?)] -> (Tab, Bool)
+let handled(tab, entries) do
+  match field(entries, "event") do
+    "press" => (Tab { presses: tab.presses + 1 }, false)
+    "reset" => (Tab { notice: "Back to zero." }, false)
+    "dismiss" => (Tab { presses: tab.presses }, false)
+    _ => (tab, false)
+  end
+end

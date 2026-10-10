@@ -1,0 +1,31 @@
+# Every migration of this application, in order.
+#
+#   db/migrate/N0001_create_users.kex
+#   db/migrate/N0002_create_sessions.kex        ← head
+#
+# `N0001` is "number 1": the number keeps the folder in order, and the next
+# migration takes the next one. What decides the order a database runs them
+# in is what each one `follows`, so two branches that both add an `N0003_…`
+# do no harm: the server refuses to start and names the two heads, and one
+# more migration joins them:
+#
+#   let change = Harmat.Migration.merge(:merge_a_and_b, [:a, :b])
+#
+# Adding one: write db/migrate/NNNNN_<name>.kex, declaring
+# `module DB.Migrate.NNNNN<Name>` and
+# `let change = migration :<name>, follows: :<the current head> do … end`,
+# add it to the end of the list below, and declare what it creates in
+# db/schema. The server refuses to start when db/schema and the migrations
+# disagree.
+#
+#   tey migrate          # run what this database has not run
+#   tey rollback         # undo the newest; `tey rollback 3` undoes three
+module DB.Migrations
+
+using Harmat.Migration, only: [Migration]
+
+all : [Migration]
+let all = [
+  DB.Migrate.N0001CreateUsers.change,
+  DB.Migrate.N0002CreateSessions.change
+]

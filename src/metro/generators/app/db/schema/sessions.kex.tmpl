@@ -1,0 +1,20 @@
+# The `sessions` table: who is signed in where. `token_digest` is the SHA-256
+# of the token in the browser's cookie; `expires_at` is seconds since 1970.
+module DB.Schema.Sessions
+
+using Harmat.Migration, only: [string, bigint]
+using Harmat.Table, only: [Definition, define]
+
+let definition = define :sessions do
+  string(:token_digest).primaryKey
+  string(:user_id)
+  bigint(:expires_at)
+  string(:created_at)
+end
+
+let table = DB.Schema.Sessions.definition.table
+
+let tokenDigest = DB.Schema.Sessions.definition.text(:token_digest)
+let userId = DB.Schema.Sessions.definition.text(:user_id)
+let expiresAt = DB.Schema.Sessions.definition.whole(:expires_at)
+let createdAt = DB.Schema.Sessions.definition.text(:created_at)

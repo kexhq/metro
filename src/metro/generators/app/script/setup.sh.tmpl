@@ -1,0 +1,11 @@
+#!/bin/sh
+# One-time setup after generating or cloning the app.
+set -eu
+cd "$(dirname "$0")/.."
+
+# Tey looks for modules in src/ only; the app keeps them at the root.
+[ -e src ] || ln -s . src
+
+tey install
+script/setup-odbc.sh db/odbc
+echo "Ready: tey server"

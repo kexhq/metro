@@ -1,0 +1,20 @@
+# The `users` table. `password_hash` is a `Metro.Auth.Password` line, never a
+# password.
+module DB.Schema.Users
+
+using Harmat.Migration, only: [string]
+using Harmat.Table, only: [Definition, define]
+
+let definition = define :users do
+  string(:id).primaryKey
+  string(:email)
+  string(:password_hash)
+  string(:created_at)
+end
+
+let table = DB.Schema.Users.definition.table
+
+let id = DB.Schema.Users.definition.text(:id)
+let email = DB.Schema.Users.definition.text(:email)
+let passwordHash = DB.Schema.Users.definition.text(:password_hash)
+let createdAt = DB.Schema.Users.definition.text(:created_at)

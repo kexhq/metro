@@ -1,0 +1,85 @@
+# The `app` generator: the files of a new Metro application.
+#
+# A new app is the skeleton every Metro application shares — the Rails-style
+# layout, the database store and migrations, registration and sign-in, and one
+# live page to start from — with the application's name filled in. The
+# templates are the files under app/ beside this module; they are embedded
+# when Metro is built, so generating needs nothing on disk but Metro itself.
+#
+# This module only says what to write. Writing is the caller's: Tey's plugin
+# host (generators/app.kex speaks its protocol) or, until Tey can run a
+# generator, the stand-in command (generators/new.kex).
+module Metro.Generators.App
+
+# Where a new app's dependencies come from.
+record Sources do
+  rodolfo : String = "https://github.com/kexhq/rodolfo"
+  harmat : String = "https://github.com/kexhq/harmat"
+  harmatBranch : String = "database-migrations-repositories"
+  metro : String = "https://github.com/akoskovacs/metro"
+  metroBranch : String = "main"
+end
+
+# Whether a name can be an application's: lower-case letters, digits and
+# underscores, starting with a letter — it becomes a package name, a cookie
+# name and an environment variable.
+valid? : String -> Bool
+let valid?(name) do
+  let allowed = name.chars.all? { |char| char.lower? || char.digit? || "${char}" == "_" }
+  !name.empty? && allowed && name.chars.first.map { |char| char.lower? }.or(false)
+end
+
+# `chat_room` as a title: "ChatRoom".
+titled : String -> String
+let titled(name) = name.split("_").map { |part| part.capitalize }.join("")
+
+# Every file of a new application named `name`, as (path, content).
+files : String -> Sources -> [(String, String)]
+let files(name, sources) = templates().map { |template|
+  match template do (path, text) => (path, filled(text, name, sources)) end
+}
+
+private do
+  filled : String -> String -> Sources -> String
+  let filled(text, name, sources) do
+    text.replace("__APP__", name.upperCase).replace("__App__", titled(name)).replace("__app__", name)
+      .replace("__RODOLFO__", sources.rodolfo)
+      .replace("__HARMAT_BRANCH__", sources.harmatBranch).replace("__HARMAT__", sources.harmat)
+      .replace("__METRO_BRANCH__", sources.metroBranch).replace("__METRO__", sources.metro)
+  end
+
+  templates : [(String, String)]
+  let templates = [
+  (".gitignore", Kex.embed("app/.gitignore.tmpl")),
+  ("README.md", Kex.embed("app/README.md.tmpl")),
+  ("app/forms/credentials.kex", Kex.embed("app/app/forms/credentials.kex.tmpl")),
+  ("app/live/home.kex", Kex.embed("app/app/live/home.kex.tmpl")),
+  ("app/live/tab.kex", Kex.embed("app/app/live/tab.kex.tmpl")),
+  ("app/models/user.kex", Kex.embed("app/app/models/user.kex.tmpl")),
+  ("app/services/authentication.kex", Kex.embed("app/app/services/authentication.kex.tmpl")),
+  ("app/views/auth.kex", Kex.embed("app/app/views/auth.kex.tmpl")),
+  ("app/views/auth/register.html.ket", Kex.embed("app/app/views/auth/register.html.ket.tmpl")),
+  ("app/views/auth/signin.html.ket", Kex.embed("app/app/views/auth/signin.html.ket.tmpl")),
+  ("app/views/home.kex", Kex.embed("app/app/views/home.kex.tmpl")),
+  ("app/views/home/index.html.ket", Kex.embed("app/app/views/home/index.html.ket.tmpl")),
+  ("app/views/layouts/application.html.ket", Kex.embed("app/app/views/layouts/application.html.ket.tmpl")),
+  ("app/views/layouts/auth.html.ket", Kex.embed("app/app/views/layouts/auth.html.ket.tmpl")),
+  ("config/database.kex", Kex.embed("app/config/database.kex.tmpl")),
+  ("config/routes.kex", Kex.embed("app/config/routes.kex.tmpl")),
+  ("db/migrate/N0001_create_users.kex", Kex.embed("app/db/migrate/N0001_create_users.kex.tmpl")),
+  ("db/migrate/N0002_create_sessions.kex", Kex.embed("app/db/migrate/N0002_create_sessions.kex.tmpl")),
+  ("db/migrations.kex", Kex.embed("app/db/migrations.kex.tmpl")),
+  ("db/repositories/sessions.kex", Kex.embed("app/db/repositories/sessions.kex.tmpl")),
+  ("db/repositories/users.kex", Kex.embed("app/db/repositories/users.kex.tmpl")),
+  ("db/schema.kex", Kex.embed("app/db/schema.kex.tmpl")),
+  ("db/schema/sessions.kex", Kex.embed("app/db/schema/sessions.kex.tmpl")),
+  ("db/schema/users.kex", Kex.embed("app/db/schema/users.kex.tmpl")),
+  ("db/store.kex", Kex.embed("app/db/store.kex.tmpl")),
+  ("main.kex", Kex.embed("app/main.kex.tmpl")),
+  ("package.kex", Kex.embed("app/package.kex.tmpl")),
+  ("public/app.css", Kex.embed("app/public/app.css.tmpl")),
+  ("script/setup-odbc.sh", Kex.embed("app/script/setup-odbc.sh.tmpl")),
+  ("script/setup.sh", Kex.embed("app/script/setup.sh.tmpl")),
+  ("spec/app.spec.kex", Kex.embed("app/spec/app.spec.kex.tmpl"))
+  ]
+end
