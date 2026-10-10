@@ -10,6 +10,28 @@ application needed and nothing speculative. HTTP is
 [Rodolfo](https://github.com/kexhq/rodolfo)'s for now; the database is
 [Harmat](https://github.com/kexhq/harmat)'s, and Metro does not depend on it.
 
+## Starting an application
+
+Metro ships a generator for the skeleton every application shares: the
+Rails-style layout (`app/`, `config/`, `db/`), a database store with users
+and sessions migrations, registration and sign-in behind plugs, one live page
+to start from, a setup script and a smoke spec.
+
+```sh
+# from a Metro checkout
+tey new-app ../chat          # --name chat_room to name it differently
+cd ../chat && git init
+script/setup.sh              # src link, dependencies, the ODBC port program
+tey server                   # http://127.0.0.1:4000
+```
+
+The generator is declared as a Tey plugin (`metro:app` in `package.kex`), and
+`generators/app.kex` speaks Tey's generator protocol. Tey cannot run a
+plugin's generator yet — it has no `generate` command — so `tey new-app` runs
+the same code in the meantime. Because Metro declares a plugin, `tey install`
+in an application that depends on it asks once to approve it
+(`--approve-plugins` answers yes).
+
 ## Live pages
 
 A live page is three things you supply — a starting state, a function from
@@ -92,8 +114,10 @@ application's.
 
 ## Not here yet
 
+Localization: every message Metro produces (validation errors, the
+same-origin refusal) and every generated page is English text in the code.
 Components and a view tree, diffing on the server, row-level sync, sessions
-and CSRF as one construct, a router of its own, generators. See the plan in
+and CSRF as one construct, a router of its own, generators beyond `app`. See the plan in
 Kex's `docs/web-stack-plan.md`.
 
 ## Develop
