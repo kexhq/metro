@@ -61,6 +61,6 @@ main(args) do
   IO.printLine("Next:")
   IO.printLine("  cd ${directory}")
   IO.printLine("  git init")
-  IO.printLine("  script/setup.sh")
+  IO.printLine("  sh script/setup.sh")
   IO.printLine("  tey server")
 end

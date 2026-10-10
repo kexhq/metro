@@ -17,20 +17,28 @@ Rails-style layout (`app/`, `config/`, `db/`), a database store with users
 and sessions migrations, registration and sign-in behind plugs, one live page
 to start from, a setup script and a smoke spec.
 
+It is a Tey plugin, `metro:app`, run from a package that depends on Metro:
+
 ```sh
-# from a Metro checkout
-tey new-app ../chat          # --name chat_room to name it differently
-cd ../chat && git init
-script/setup.sh              # src link, dependencies, the ODBC port program
-tey server                   # http://127.0.0.1:4000
+mkdir chat && cd chat
+tey init chat --app
+tey add rodolfo --git https://github.com/kexhq/rodolfo --branch main
+tey add harmat --git https://github.com/kexhq/harmat --branch database-migrations-repositories
+tey add metro --git https://github.com/akoskovacs/metro --branch main   # asks to approve the plugin
+tey generate metro:app --force     # --force: it replaces what `tey init` wrote
+sh script/setup.sh                 # src link, dependencies, the ODBC port program
+tey server                         # http://127.0.0.1:4000
 ```
 
-The generator is declared as a Tey plugin (`metro:app` in `package.kex`), and
-`generators/app.kex` speaks Tey's generator protocol. Tey cannot run a
-plugin's generator yet — it has no `generate` command — so `tey new-app` runs
-the same code in the meantime. Because Metro declares a plugin, `tey install`
-in an application that depends on it asks once to approve it
-(`--approve-plugins` answers yes).
+`--name chat_room` names the app differently from its directory; `--metro`
+and `--harmat` give other sources for those two dependencies.
+
+`tey generate` needs a Tey that has it (newer than 0.2.1). From a Metro
+checkout the same generator also runs in one step, with any Tey:
+
+```sh
+tey new-app ../chat
+```
 
 ## Live pages
 

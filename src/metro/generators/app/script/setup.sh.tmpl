@@ -9,5 +9,5 @@ if [ -d src ] && [ ! -L src ]; then rmdir src; fi
 [ -e src ] || ln -s . src
 
 tey install --approve-plugins
-script/setup-odbc.sh db/odbc
+sh script/setup-odbc.sh db/odbc
 echo "Ready: tey server"
