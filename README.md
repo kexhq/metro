@@ -33,6 +33,9 @@ tey server                         # http://127.0.0.1:4000
 `--name chat_room` names the app differently from its directory; `--metro`
 and `--harmat` give other sources for those two dependencies.
 
+Once the app exists, Harmat's plugin adds migrations to it:
+`tey generate harmat:migration --name add_channels --force`.
+
 `tey generate` needs a Tey that has it (newer than 0.2.1). From a Metro
 checkout the same generator also runs in one step, with any Tey:
 
