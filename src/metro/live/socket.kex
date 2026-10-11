@@ -41,7 +41,7 @@ end
 # @param step [S -> [(String, String?)] -> (S, Bool)] applies one event: the
 #   next state, and whether data other tabs show was changed
 # @param render [S -> String] the live region's markup for a state
-foul attached(socket: Connection, hub: Server<Hub>, group: String, state: S, step: S -> [(String, String?)] -> (S, Bool), render: S -> String) -> Void do
+foul attached(socket: Net.HTTP.WebSocket.Connection, hub: Server<Hub>, group: String, state: S, step: S -> [(String, String?)] -> (S, Bool), render: S -> String) -> Void do
   let tab = "${BEAM.erlang.unique_integer([:positive])}"
   hub.joined(tab, group, socket)
   var current = state

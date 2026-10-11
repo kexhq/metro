@@ -5,13 +5,13 @@
 # sends back into the page. A page opts in with three things:
 #
 #   <main id="app">…the live region…</main>           what gets patched
-#   <span id="status" data-state="connecting"></span>  where the connection state shows
+#   <span id="status" data-state="connecting"></span>  where the request state shows
 #   <script src="/metro/live.js"></script>
 #
 # and the server answers the WebSocket at `/live` with `Metro.Live.Socket`.
 module Metro.Live.Client
 
-using Metro.Connection, only: [Connection]
+using Metro.WebRequest, only: [WebRequest]
 
 # Where the script is served.
 let PATH = "/metro/live.js"
@@ -23,8 +23,8 @@ let script = Kex.embed("live.js")
 
 # The route to put in a router: `Metro.Live.Client.route()`.
 route : Metro.Router.Entry
-let route = Metro.Router.get(PATH, do |connection|
-  connection.withHeader("Content-Type", "text/javascript; charset=utf-8").plain(Metro.Live.Client.script)
+let route = Metro.Router.get(PATH, do |request|
+  request.withHeader("Content-Type", "text/javascript; charset=utf-8").plain(Metro.Live.Client.script)
 end)
 
 # The script's address with a mark of what is in it, so a browser that has

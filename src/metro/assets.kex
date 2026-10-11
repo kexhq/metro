@@ -1,0 +1,19 @@
+# Files a page asks for, addressed by what is in them.
+#
+# A browser keeps a stylesheet it has fetched, and goes on showing it after
+# the file has changed. `marked` puts a mark of the file's contents on its
+# address — `/app.css?v=3f9a61c0d2e4` — wherever a page names it, so the
+# address changes exactly when the file does.
+module Metro.Assets
+
+# A page's markup with each of `files` (as the page names them: "/app.css")
+# marked from its contents in `directory`, and Metro's own live script
+# likewise.
+marked : String -> String -> [String] -> String
+foul marked(markup, directory, files) do
+  let scripted = markup.replace("\"${Metro.Live.Client.PATH}\"", "\"${Metro.Live.Client.address()}\"")
+  return files.reduce(scripted) { |page, file|
+    let mark = Digest.sha256(FS.File.read("${directory}${file}").or("")).take(12)
+    page.replace("\"${file}\"", "\"${file}?v=${mark}\"")
+  }
+end

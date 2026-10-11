@@ -1,55 +1,55 @@
-using Metro.Connection, only: [Connection, Plug, plug]
+using Metro.WebRequest, only: [WebRequest, Plug, plug]
 using Metro.Router, only: [Resource, pipeline, scope, get, post, live, static, resources]
 
 module Things do
-  foul index(connection: Connection) -> Connection = connection.plain("all things")
-  foul show(connection: Connection) -> Connection = connection.plain("thing ${connection.param("id").or("?")}")
-  foul create(connection: Connection) -> Connection = connection.json(201, {"made": connection.param("name").or("")})
+  foul index(request: WebRequest) -> WebRequest = request.plain("all things")
+  foul show(request: WebRequest) -> WebRequest = request.plain("thing ${request.param("id").or("?")}")
+  foul create(request: WebRequest) -> WebRequest = request.json(201, {"made": request.param("name").or("")})
 
   let resource = Resource { index: Just(~index), show: Just(~show), create: Just(~create) }
 end
 
 # Lets a request with the right header through, noting who it is.
-let admitted = plug do |connection|
-  match connection.header("X-User") do
-    Just(name) => connection.assign(:user, name)
-    None => connection.plain(401, "Who are you?")
+let admitted = plug do |request|
+  match request.header("X-User") do
+    Just(name) => request.assign(:user, name)
+    None => request.plain(401, "Who are you?")
   end
 end
 
-let stamped = plug do |connection| connection.withHeader("X-Stamped", "yes") end
+let stamped = plug do |request| request.withHeader("X-Stamped", "yes") end
 
 let routes = Metro.Router.define do
   pipeline(:marked, [stamped])
   pipeline(:members, [admitted])
 
-  get "/" do |connection| connection.html("<h1>home</h1>") end
-  get "/silent" do |connection| connection end
-  get "/broken" do |connection| connection.plain(Error("it broke").try) end
+  get "/" do |request| request.html("<h1>home</h1>") end
+  get "/silent" do |request| request end
+  get "/broken" do |request| request.plain(Error("it broke").try) end
 
   scope "/app", via: [:marked, :members] do
-    get "/me" do |connection|
-      let name : String = connection.assigned(:user).try
-      connection.plain("you are ${name}")
+    get "/me" do |request|
+      let name : String = request.assigned(:user).try
+      request.plain("you are ${name}")
     end
-    post "/go" do |connection| connection.redirect("/app/me") end
+    post "/go" do |request| request.redirect("/app/me") end
     resources("/things", Things.resource)
     get("/listed", ~Things.index)
 
     scope "/deep", via: [:marked] do
-      get "/:first/and/:second" do |connection| connection.plain("${connection.param("first").or("")}+${connection.param("second").or("")}") end
+      get "/:first/and/:second" do |request| request.plain("${request.param("first").or("")}+${request.param("second").or("")}") end
     end
   end
 
   scope "/nowhere", via: [:missing] do
-    get "/" do |connection| connection.plain("unreachable") end
+    get "/" do |request| request.plain("unreachable") end
   end
 
   static("spec")
 end
 
-foul answer(connection: Connection) -> (Integer, String) do
-  let answered = routes.call(connection)
+foul answer(request: WebRequest) -> (Integer, String) do
+  let answered = routes.call(request)
   (answered.code, answered.payload.to(String).or(""))
 end
 
@@ -63,53 +63,53 @@ describe("Metro.Router") do
   end
 
   it("answers a route with its action") do
-    Assert.equal(answer(Metro.Connection.asked("GET", "/")), (200, "<h1>home</h1>"))
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/")).outgoing.get("Content-Type"), Just("text/html; charset=utf-8"))
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/")), (200, "<h1>home</h1>"))
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/")).outgoing.get("Content-Type"), Just("text/html; charset=utf-8"))
   end
 
   it("runs a scope's pipelines first, and stops at a plug that answers") do
-    Assert.equal(answer(Metro.Connection.asked("GET", "/app/me")), (401, "Who are you?"))
-    let admittedIn = routes.call(Metro.Connection.asked("GET", "/app/me", [("X-User", "ada")], ""))
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/app/me")), (401, "Who are you?"))
+    let admittedIn = routes.call(Metro.WebRequest.asked("GET", "/app/me", [("X-User", "ada")], ""))
     Assert.equal(admittedIn.payload.to(String).or(""), "you are ada")
     Assert.equal(admittedIn.outgoing.get("X-Stamped"), Just("yes"))
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/")).outgoing.get("X-Stamped"), None)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/")).outgoing.get("X-Stamped"), None)
   end
 
   it("reads params from the path, the query, a form and JSON") do
-    Assert.equal(answer(Metro.Connection.asked("GET", "/app/deep/a/and/b", [("X-User", "ada")], "")), (200, "a+b"))
-    Assert.equal(answer(Metro.Connection.asked("GET", "/app/things/42", [("X-User", "ada")], "")), (200, "thing 42"))
-    Assert.equal(answer(Metro.Connection.asked("POST", "/app/things", [("X-User", "ada")], "name=a+b")), (201, "{\"made\":\"a b\"}"))
-    Assert.equal(answer(Metro.Connection.asked("POST", "/app/things", [("X-User", "ada")], "{\"name\": \"json\"}")), (201, "{\"made\":\"json\"}"))
-    Assert.equal(Metro.Connection.asked("GET", "/x?q=one+two&r").query("q"), Just("one two"))
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/app/deep/a/and/b", [("X-User", "ada")], "")), (200, "a+b"))
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/app/things/42", [("X-User", "ada")], "")), (200, "thing 42"))
+    Assert.equal(answer(Metro.WebRequest.asked("POST", "/app/things", [("X-User", "ada")], "name=a+b")), (201, "{\"made\":\"a b\"}"))
+    Assert.equal(answer(Metro.WebRequest.asked("POST", "/app/things", [("X-User", "ada")], "{\"name\": \"json\"}")), (201, "{\"made\":\"json\"}"))
+    Assert.equal(Metro.WebRequest.asked("GET", "/x?q=one+two&r").query("q"), Just("one two"))
   end
 
   it("redirects") do
-    let gone = routes.call(Metro.Connection.asked("POST", "/app/go", [("X-User", "ada")], ""))
+    let gone = routes.call(Metro.WebRequest.asked("POST", "/app/go", [("X-User", "ada")], ""))
     Assert.equal(gone.code, 303)
     Assert.equal(gone.outgoing.get("Location"), Just("/app/me"))
   end
 
   it("takes a named function as an action") do
-    Assert.equal(answer(Metro.Connection.asked("GET", "/app/listed", [("X-User", "ada")], "")), (200, "all things"))
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/app/listed", [("X-User", "ada")], "")), (200, "all things"))
   end
 
   it("only offers the actions a resource has") do
-    Assert.equal(answer(Metro.Connection.asked("GET", "/app/things", [("X-User", "ada")], "")), (200, "all things"))
-    Assert.equal(routes.call(Metro.Connection.asked("DELETE", "/app/things/1", [("X-User", "ada")], "")).code, 404)
+    Assert.equal(answer(Metro.WebRequest.asked("GET", "/app/things", [("X-User", "ada")], "")), (200, "all things"))
+    Assert.equal(routes.call(Metro.WebRequest.asked("DELETE", "/app/things/1", [("X-User", "ada")], "")).code, 404)
   end
 
   it("answers 500 for an action that raises, writes nothing, or names no pipeline") do
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/broken")).code, 500)
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/silent")).code, 500)
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/nowhere")).code, 500)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/broken")).code, 500)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/silent")).code, 500)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/nowhere")).code, 500)
   end
 
   it("serves files of a folder, and nothing outside it") do
-    let served = routes.call(Metro.Connection.asked("GET", "/router.spec.kex"))
+    let served = routes.call(Metro.WebRequest.asked("GET", "/router.spec.kex"))
     Assert.equal(served.code, 200)
     Assert.truthy(served.payload.to(String).or("").contains?("describe(\"Metro.Router\")"))
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/../package.kex")).code, 404)
-    Assert.equal(routes.call(Metro.Connection.asked("GET", "/no-such-file")).code, 404)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/../package.kex")).code, 404)
+    Assert.equal(routes.call(Metro.WebRequest.asked("GET", "/no-such-file")).code, 404)
   end
 end
 
@@ -118,12 +118,12 @@ describe("Metro.Plugs") do
     let guarded = Metro.Router.define do
       pipeline(:browser, [Metro.Plugs.sameOrigin])
       scope "/", via: [:browser] do
-        post "/act" do |connection| connection.plain("done") end
-        get "/see" do |connection| connection.plain("seen") end
+        post "/act" do |request| request.plain("done") end
+        get "/see" do |request| request.plain("seen") end
       end
     end
-    Assert.equal(guarded.call(Metro.Connection.asked("POST", "/act", [("Origin", "http://evil.example"), ("Host", "slick.test")], "")).code, 403)
-    Assert.equal(guarded.call(Metro.Connection.asked("POST", "/act", [("Origin", "http://slick.test"), ("Host", "slick.test")], "")).code, 200)
-    Assert.equal(guarded.call(Metro.Connection.asked("GET", "/see", [("Origin", "http://evil.example"), ("Host", "slick.test")], "")).code, 200)
+    Assert.equal(guarded.call(Metro.WebRequest.asked("POST", "/act", [("Origin", "http://evil.example"), ("Host", "slick.test")], "")).code, 403)
+    Assert.equal(guarded.call(Metro.WebRequest.asked("POST", "/act", [("Origin", "http://slick.test"), ("Host", "slick.test")], "")).code, 200)
+    Assert.equal(guarded.call(Metro.WebRequest.asked("GET", "/see", [("Origin", "http://evil.example"), ("Host", "slick.test")], "")).code, 200)
   end
 end

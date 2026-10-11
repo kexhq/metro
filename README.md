@@ -91,7 +91,7 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
 - `data-live-enter` on a textarea of a live form makes Enter send the form and
   Shift+Enter start a new line.
 - `data-live-keep` on an element keeps a patch from writing over it: the
-  `#status` connection indicator, when it is inside the live region.
+  `#status` request indicator, when it is inside the live region.
 - `<details data-menu>` is a menu: it stays open across patches, and closes
   when something in it is chosen, on a click elsewhere, or on Escape.
 - `data-live-typing` on a live form sends a `typing` event, at most every few

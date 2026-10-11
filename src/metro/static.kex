@@ -6,8 +6,8 @@
 # `Metro.Router`'s `static "public"` is the way in.
 module Metro.Static
 
-using Net.HTTP, only: [Headers, Request]
-using Metro.Connection, only: [Connection]
+using Net.HTTP, only: [Headers]
+using Metro.WebRequest, only: [WebRequest]
 
 # The media type for a file name, by its extension.
 mimeType : String -> String
@@ -17,11 +17,11 @@ end
 
 # Answers with a file of a directory, a 304 when the browser's copy is still
 # good, or a 404 — also for a path that would leave the directory.
-within : Connection -> String -> String -> Connection
-foul within(connection, directory, relative) do
+within : WebRequest -> String -> String -> WebRequest
+foul within(request, directory, relative) do
   match contained(directory, relative) do
-    Just(real) => return regular(connection, real, mimeType(relative))
-    None => return connection.plain(404, "Not Found")
+    Just(real) => return regular(request, real, mimeType(relative))
+    None => return request.plain(404, "Not Found")
   end
 end
 
@@ -35,35 +35,35 @@ private do
 
   let beneath(root: String) -> String = root.endsWith?("/") then root else "${root}/"
 
-  foul regular(connection: Connection, path: String, contentType: String) -> Connection do
+  foul regular(request: WebRequest, path: String, contentType: String) -> WebRequest do
     match FS.File.info(path) do
       Ok(info) => do
-        return connection.plain(404, "Not Found") if info.kind != :file
-        return answered(connection, path, info, contentType)
+        return request.plain(404, "Not Found") if info.kind != :file
+        return answered(request, path, info, contentType)
       end
-      Error(_) => return connection.plain(404, "Not Found")
+      Error(_) => return request.plain(404, "Not Found")
     end
   end
 
-  foul answered(connection: Connection, path: String, info: FS.FileInfo, contentType: String) -> Connection do
+  foul answered(request: WebRequest, path: String, info: FS.FileInfo, contentType: String) -> WebRequest do
     let tag = entityTag(info)
     let stamp = httpDate(info.modified)
-    let validated = connection.withHeader("ETag", tag).withHeader("Last-Modified", stamp)
-    return validated.withoutBody(304) if unchanged?(connection.request, tag, stamp)
+    let validated = request.withHeader("ETag", tag).withHeader("Last-Modified", stamp)
+    return validated.withoutBody(304) if unchanged?(request.incoming, tag, stamp)
 
     match FS.File.readBytes(path) do
       Ok(content) => return validated.bytes(200, content, contentType)
-      Error(_) => return connection.plain(404, "Not Found")
+      Error(_) => return request.plain(404, "Not Found")
     end
   end
 
-  let unchanged?(request: Request<Binary>, tag: String, stamp: String) -> Bool do
-    return false if request.method != "GET" && request.method != "HEAD"
-    match request.headers.get("If-None-Match") do
+  let unchanged?(incoming: Metro.Wire.Incoming, tag: String, stamp: String) -> Bool do
+    return false if Metro.Wire.verbOf(incoming) != "GET" && Metro.Wire.verbOf(incoming) != "HEAD"
+    match Metro.Wire.headerOf(incoming, "If-None-Match") do
       Just(sent) => sent.split(",").map { |candidate| candidate.trim }.any? { |candidate|
         candidate == "*" || opaque(candidate) == opaque(tag)
       }
-      None => request.headers.get("If-Modified-Since") == Just(stamp)
+      None => Metro.Wire.headerOf(incoming, "If-Modified-Since") == Just(stamp)
     end
   end
 

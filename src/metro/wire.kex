@@ -1,0 +1,38 @@
+# The request as the HTTP server hands it over, and the only module that
+# knows its shape.
+#
+# `Metro.WebRequest` is what an application sees. It cannot name the standard
+# library's own `Request` beside its own — the two share a name — so what it
+# needs of that one is asked for here.
+module Metro.Wire
+
+using Net.HTTP, only: [Request, Headers]
+
+# A request with its body read, as `Net.HTTP` gives it to a route.
+record Incoming do
+  raw : Request<Binary>
+end
+
+received : Request<Binary> -> Incoming
+let received(raw) = Incoming { raw: raw }
+
+verbOf : Incoming -> String
+let verbOf(incoming) = incoming.raw.method
+
+# The address asked for, with its query string.
+addressOf : Incoming -> String
+let addressOf(incoming) = incoming.raw.target.string
+
+headerOf : Incoming -> String -> String?
+let headerOf(incoming, name) = incoming.raw.headers.get(name)
+
+# The body as text; "" when it is not text.
+textOf : Incoming -> String
+let textOf(incoming) = incoming.raw.body.to(String).or("")
+
+# A request made by hand, for specs.
+made : String -> String -> [(String, String)] -> String -> Incoming
+let made(method, address, headers, body) = Incoming { raw: Request {
+  method: method, target: URI.parse(address).or(URI.parse("/").try),
+  headers: Headers.from(headers).or(Headers.empty), body: body.to(Binary).or(Binary.empty)
+} }

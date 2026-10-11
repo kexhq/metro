@@ -11,9 +11,9 @@
 #
 #     scope "/", via: [:browser] do
 #       get("/", ~App.Controllers.Chat.show)
-#       live("/live", ~App.Live.Chat.joined)
+#       live "/live" do |request, socket| App.Live.Chat.joined(request, socket) end
 #       resources("/channels", App.Controllers.Channels.resource)
-#       get "/about" do |connection| connection.html(App.Views.About.page()) end
+#       get "/about" do |request| request.html(App.Views.About.page()) end
 #     end
 #
 #     static("public")
@@ -21,7 +21,7 @@
 #
 # A **pipeline** is a named list of plugs. A **scope** puts a path in front
 # of its routes and runs them through pipelines: its own after those of the
-# scope around it. A **route** names the action — any `Connection -> Connection`, a
+# scope around it. A **route** names the action — any `WebRequest -> WebRequest`, a
 # function or a block — that answers once the plugs have let the request
 # through; a plug that answers ends it there. A **live** route is a
 # WebSocket behind the same plugs: a plug that refuses the request refuses
@@ -30,14 +30,14 @@
 # Earlier routes win. `routes.start(host, port)` serves them.
 module Metro.Router
 
-using Net.HTTP, only: [Request, Context, Headers, Route, Server]
+using Net.HTTP, only: [Context, Headers, Route, Server]
 using Net.HTTP.WebSocket, only: [WebSocket, Accept]
 using Net.Socket
-using Metro.Connection, only: [Connection, Plug]
+using Metro.WebRequest, only: [WebRequest, Plug]
 
 # A WebSocket's handler: the request it was opened with, plugs applied, and
 # the open socket.
-type SocketHandler = Connection -> Net.HTTP.WebSocket.Connection -> Void
+type SocketHandler = WebRequest -> Net.HTTP.WebSocket.Connection -> Void
 
 record PipelineEntry do
   label : Atom
@@ -154,18 +154,18 @@ make Router do
 
   # Answers a request without a server: for specs, and for nothing else. The
   # matching here is this module's own and simpler than the server's.
-  foul call(connection: Connection) -> Connection do
-    match this.table.find { |flat| flat.socket.none? && flat.verb == connection.verb && Metro.Path.define(flat.path).captured(connection.path).set? } do
-      Just(flat) => return ran(flat, Connection { ...connection, captures: Metro.Path.define(flat.path).captured(connection.path).or({}) })
-      None => return connection.plain(404, "Not Found")
+  foul call(request: WebRequest) -> WebRequest do
+    match this.table.find { |flat| flat.socket.none? && flat.verb == request.verb && Metro.Path.define(flat.path).captured(request.path).set? } do
+      Just(flat) => return ran(flat, WebRequest { ...request, captures: Metro.Path.define(flat.path).captured(request.path).or({}) })
+      None => return request.plain(404, "Not Found")
     end
   end
 
   foul start(host: String, port: Integer) -> Result<Void, NetError> do
-    Server.serve(Net.Socket.TCP.Endpoint.host(host, Net.Port.from(port).try), this.served)
+    Server.serve(Net.Socket.TCP.Endpoint.host(host, Net.Port.from(port).try), this.httpRouter)
   end
 
-  foul served -> Net.HTTP.Router = Net.HTTP.Router { routes: this.table.map { |flat| routed(flat) } }
+  foul httpRouter -> Net.HTTP.Router = Net.HTTP.Router { routes: this.table.map { |flat| routed(flat) } }
 end
 
 private do
@@ -200,7 +200,7 @@ private do
   let piped(names, known) = names.flatMap { |name|
     match known.find { |pipeline| pipeline.label == name } do
       Just(found) => found.plugs
-      None => [do |connection| connection.plain(500, "Metro.Router: no pipeline is called ${name}") end]
+      None => [do |request| request.plain(500, "Metro.Router: no pipeline is called ${name}") end]
     end
   }
 
@@ -215,8 +215,8 @@ private do
 
   # The plugs in turn, then the action — or the file — unless one of the
   # plugs answered. Something raised anywhere in it is a 500, and is said.
-  foul ran(flat: Flat, connection: Connection) -> Connection do
-    let passed = flat.plugs.reduce(connection) { |current, plug| current.sent? then current else plug(current) }
+  foul ran(flat: Flat, request: WebRequest) -> WebRequest do
+    let passed = flat.plugs.reduce(request) { |current, plug| current.sent? then current else plug(current) }
     return passed if passed.sent?
 
     match flat.action do
@@ -230,26 +230,26 @@ private do
     end
   rescue |error|
     IO.printError("Metro: ${flat.verb} ${flat.path} raised ${error}\n")
-    return connection.plain(500, "Internal Server Error")
+    return request.plain(500, "Internal Server Error")
   end
 
   foul routed(flat: Flat) -> Route = Route {
     method: flat.verb,
     path: flat.path,
-    handler: do |request, context|
+    handler: do |incoming, context|
       let matched : Net.HTTP.RouteContext = context.route
-      let connection = Connection { request: request, captures: matched.parameters }
+      let request = WebRequest { incoming: Metro.Wire.received(incoming), captures: matched.parameters }
       match flat.socket do
-        None => written(ran(flat, connection))
+        None => written(ran(flat, request))
         Just(handler) => do
           # The plugs decide before the socket opens: one that answers has
           # refused it, and its answer is what the browser gets.
-          let passed = flat.plugs.reduce(connection) { |current, plug| current.sent? then current else plug(current) }
-          passed.sent? then written(passed) else WebSocket.upgrade(request, do |handshake| Accept(do |socket| handler(passed, socket) end, Headers.empty, None) end)
+          let passed = flat.plugs.reduce(request) { |current, plug| current.sent? then current else plug(current) }
+          passed.sent? then written(passed) else WebSocket.upgrade(incoming, do |handshake| Accept(do |socket| handler(passed, socket) end, Headers.empty, None) end)
         end
       end
     end
   }
 
-  foul written(connection: Connection) -> Net.HTTP.Response<Binary> = Net.HTTP.Response.binary(connection.code, connection.payload, connection.outgoing)
+  foul written(request: WebRequest) -> Net.HTTP.Response<Binary> = Net.HTTP.Response.binary(request.code, request.payload, request.outgoing)
 end

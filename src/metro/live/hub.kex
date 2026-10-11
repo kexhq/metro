@@ -11,7 +11,7 @@ using Net.HTTP.WebSocket, only: [Connection, Text]
 # A tab's socket, and the group it belongs to: tabs showing the same data.
 record Seat do
   group : String
-  socket : Connection
+  socket : Net.HTTP.WebSocket.Connection
 end
 
 record Hub do
@@ -22,7 +22,7 @@ end
 let STALE = "stale"
 
 serving Hub do
-  slot joined(tab: String, group: String, socket: Connection) -> Void do
+  slot joined(tab: String, group: String, socket: Net.HTTP.WebSocket.Connection) -> Void do
     new.tabs = @tabs.put(tab, Seat { group: group, socket: socket })
     return new
   end
