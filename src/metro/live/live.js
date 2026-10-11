@@ -10,14 +10,17 @@
   "use strict";
 
   const app = document.getElementById("app");
-  const status = document.getElementById("status");
   const TYPING_PAUSE = 250;
 
   let socket = null;
   let attempts = 0;
   let typing = null;
 
+  // Where the connection state shows. It may be inside the live region —
+  // mark it `data-live-keep`, so a patch leaves what is written here alone.
   function show(state, text) {
+    const status = document.getElementById("status");
+    if (!status) return;
     status.dataset.state = state;
     status.textContent = text;
   }
@@ -115,6 +118,9 @@
     }
     const button = click.target.closest("[data-event]");
     if (!button) return;
+    // Choosing from a menu closes it.
+    const menu = button.closest("details[data-menu]");
+    if (menu) menu.open = false;
     clearTimeout(typing);
     send({ ...button.dataset });
   });
@@ -126,6 +132,18 @@
     field.focus();
     field.setSelectionRange(start + text.length, start + text.length);
   }
+
+  // `<details data-menu>` is a menu: a click anywhere else closes it, and so
+  // does Escape.
+  document.addEventListener("click", (click) => {
+    for (const menu of document.querySelectorAll("details[data-menu][open]")) {
+      if (!menu.contains(click.target)) menu.open = false;
+    }
+  });
+  document.addEventListener("keydown", (key) => {
+    if (key.key !== "Escape") return;
+    for (const menu of document.querySelectorAll("details[data-menu][open]")) menu.open = false;
+  });
 
   function wrapWith(field, mark) {
     const start = field.selectionStart ?? field.value.length;
@@ -295,7 +313,13 @@
       if (existing.nodeValue !== next.nodeValue) existing.nodeValue = next.nodeValue;
       return;
     }
+    // `data-live-keep`: an element the browser's side writes into — the
+    // connection state — and the server's markup must not write over.
+    if (existing.hasAttribute("data-live-keep")) return;
     for (const name of existing.getAttributeNames()) {
+      // Whether a <details> is open is the person's doing, like what is
+      // typed in a field.
+      if (name === "open" && existing.nodeName === "DETAILS") continue;
       if (!next.hasAttribute(name)) existing.removeAttribute(name);
     }
     for (const name of next.getAttributeNames()) {
