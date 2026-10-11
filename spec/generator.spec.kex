@@ -1,0 +1,29 @@
+using Metro.Generators.App, only: [Sources]
+
+describe("Metro.Generators.App") do
+  let files = Metro.Generators.App.files("chat_room", Sources {})
+  let written(path: String) -> String do
+    match files.find { |file| match file do (name, _) => name == path end } do
+      Just((_, text)) => text
+      None => ""
+    end
+  end
+
+  it("takes names a package, a cookie and a database can have") do
+    Assert.truthy(Metro.Generators.App.valid?("chat_room"))
+    Assert.falsy(Metro.Generators.App.valid?("Chat"))
+    Assert.falsy(Metro.Generators.App.valid?("9lives"))
+  end
+
+  it("writes a Dockerfile and a compose file that run the app on PostgreSQL") do
+    Assert.truthy(written("Dockerfile").contains?("# ChatRoom in a container"))
+    Assert.truthy(written("Dockerfile").contains?("odbc-postgresql"))
+    Assert.truthy(written(".dockerignore").contains?("package.local.kex"))
+    let compose = written("docker-compose.yml")
+    Assert.truthy(compose.contains?("image: postgres:17"))
+    Assert.truthy(compose.contains?("POSTGRES_DB: chat_room"))
+    Assert.truthy(compose.contains?("Database=chat_room;Uid=chat_room;Pwd="))
+    Assert.truthy(compose.contains?("POSTGRES_PASSWORD:-chat_room}"))
+    Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("__app__") || text.contains?("__App__") end })
+  end
+end
