@@ -1,0 +1,55 @@
+# Metro.Environment — where this process is running, read the same way by
+# every Metro application.
+#
+#   METRO_ENV   development (the default), test or production
+#   PORT        the port the application listens on; 4000 unless set
+#   HOST        the address it binds; 127.0.0.1 unless set
+#
+#   match Metro.Environment.current() do
+#     Ok(Production) => …
+#     Ok(environment) => IO.printLine("running in ${environment.label}")
+#     Error(reason) => …
+#   end
+#
+# An application does not name an environment variable of its own for this:
+# what differs between environments — which database, say — is decided from
+# `current`, in the application's config/.
+module Metro.Environment
+
+type Environment = Development | Test | Production
+
+# The variable every Metro application's environment is chosen with.
+let VARIABLE = "METRO_ENV"
+
+# The environment METRO_ENV names, `Development` when it is not set. A name
+# that is none of the three is an error, not a guess: a misspelt
+# `production` must not quietly run as development.
+current : Result<Environment, String>
+foul current do
+  match ENV.get(VARIABLE).or("development") do
+    "development" => Ok(Development)
+    "test" => Ok(Test)
+    "production" => Ok(Production)
+    other => Error("${VARIABLE} must be development, test or production, not ${other}")
+  end
+end
+
+# The port to listen on.
+port : Integer
+foul port = ENV.get("PORT").flatMap { |text| text.to(Integer) }.or(4000)
+
+# The address to bind.
+host : String
+foul host = ENV.get("HOST").or("127.0.0.1")
+
+make Environment do
+  # The environment as METRO_ENV spells it.
+  label :> String
+  let label do
+    match this do
+      Development => "development"
+      Test => "test"
+      Production => "production"
+    end
+  end
+end

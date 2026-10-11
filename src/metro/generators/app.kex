@@ -20,8 +20,8 @@ record Sources do
 end
 
 # Whether a name can be an application's: lower-case letters, digits and
-# underscores, starting with a letter — it becomes a package name, a cookie
-# name and an environment variable.
+# underscores, starting with a letter — it becomes a package name and a
+# cookie name.
 valid? : String -> Bool
 let valid?(name) do
   let allowed = name.chars.all? { |char| char.lower? || char.digit? || "${char}" == "_" }
