@@ -65,11 +65,27 @@
   app.addEventListener("click", (click) => {
     // A click on the dimmed page around the dialog, not in it, dismisses it.
     if (click.target.classList.contains("backdrop")) return send({ event: "cancel" });
+    // `data-insert` types into a field instead of telling the server: an
+    // emoji button beside a message box. `data-target` is the field's selector.
+    const inserter = click.target.closest("[data-insert]");
+    if (inserter) {
+      const field = app.querySelector(inserter.dataset.target);
+      if (field) insertAt(field, inserter.dataset.insert);
+      return;
+    }
     const button = click.target.closest("[data-event]");
     if (!button) return;
     clearTimeout(typing);
     send({ ...button.dataset });
   });
+
+  function insertAt(field, text) {
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? field.value.length;
+    field.value = field.value.slice(0, start) + text + field.value.slice(end);
+    field.focus();
+    field.setSelectionRange(start + text.length, start + text.length);
+  }
 
   // While the dialog is open the keyboard belongs to it: Escape dismisses it
   // and Tab goes round its own controls instead of out to the page behind.
@@ -104,11 +120,16 @@
     submission.preventDefault();
     clearTimeout(typing);
     sendForm(form, form.dataset.live);
+    // `data-live-reset`: a form that is sent and then empty again — a message
+    // box. The server's reply cannot clear it, because what the person is
+    // typing into is left alone when the page is patched.
+    if (form.hasAttribute("data-live-reset")) form.reset();
   });
 
   app.addEventListener("input", (input) => {
     const form = input.target.closest("form[data-live]");
-    if (!form) return;
+    // `data-live-quiet`: a form the server only hears from when it is sent.
+    if (!form || form.hasAttribute("data-live-quiet")) return;
     clearTimeout(typing);
     typing = setTimeout(() => sendForm(form, "change"), TYPING_PAUSE);
   });
@@ -119,11 +140,23 @@
   let opener = null;
 
   function render(markup) {
+    // `data-stick="bottom"` on an element with an id keeps a list that grows
+    // downwards showing its newest end: after a patch it is scrolled to the
+    // bottom if it was there before, or is new. Someone reading further up
+    // is left where they are.
+    const pinned = new Map();
+    for (const list of app.querySelectorAll('[data-stick="bottom"][id]')) {
+      pinned.set(list.id, list.scrollHeight - list.scrollTop - list.clientHeight < 48);
+    }
     const wasOpen = Boolean(app.querySelector("#editor"));
     if (!wasOpen) opener = document.activeElement;
     const template = document.createElement("template");
     template.innerHTML = markup;
     patchChildren(app, template.content);
+
+    for (const list of app.querySelectorAll('[data-stick="bottom"][id]')) {
+      if (pinned.get(list.id) !== false) list.scrollTop = list.scrollHeight;
+    }
 
     const editor = app.querySelector("#editor");
     if (editor && !wasOpen) {
@@ -197,6 +230,9 @@
     }
     patchChildren(existing, next);
   }
+
+  // The page as the server first sent it has its lists at the top.
+  for (const list of app.querySelectorAll('[data-stick="bottom"][id]')) list.scrollTop = list.scrollHeight;
 
   connect();
 })();

@@ -73,6 +73,12 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   `change` while it is being typed into.
 - An element with class `backdrop` is a modal: Escape or a click on the
   backdrop sends `cancel`, and Tab stays inside it.
+- `data-live-reset` on a form empties it once it is sent (a message box);
+  `data-live-quiet` keeps it from reporting each keystroke.
+- `data-stick="bottom"` on an element with an id keeps a growing list scrolled
+  to its newest end, unless the reader has scrolled up.
+- `data-insert="😄" data-target="#box"` on a button types into a field without
+  a round trip.
 - Every reply is the live region rendered again; the script patches the page,
   keeping what is being typed.
 
