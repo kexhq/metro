@@ -24,7 +24,9 @@
 
   function connect() {
     const scheme = location.protocol === "https:" ? "wss://" : "ws://";
-    socket = new WebSocket(scheme + location.host + "/live");
+    // The socket is told where the page is, so the server can start the
+    // live view at the same place the page was rendered for.
+    socket = new WebSocket(scheme + location.host + "/live?at=" + encodeURIComponent(here()));
 
     socket.addEventListener("open", () => {
       attempts = 0;
@@ -47,6 +49,36 @@
       setTimeout(connect, Math.min(5000, 250 * 2 ** attempts));
     });
   }
+
+  // --- The address bar ------------------------------------------------------
+
+  // `data-live-path` on an element of the live region says where the page
+  // now is: after a render the address bar is made to say the same, as a new
+  // history entry. Back and forward send a `visit` event with the address
+  // gone to, and the server renders that place. `data-live-title` names the
+  // document the same way.
+  let visiting = false;
+
+  function here() {
+    return location.pathname + location.search;
+  }
+
+  function addressed() {
+    const placed = app.querySelector("[data-live-path]");
+    if (placed && placed.dataset.livePath && placed.dataset.livePath !== here()) {
+      // A place arrived at through history is not a new entry in it.
+      if (visiting) history.replaceState(null, "", placed.dataset.livePath);
+      else history.pushState(null, "", placed.dataset.livePath);
+    }
+    visiting = false;
+    const titled = app.querySelector("[data-live-title]");
+    if (titled && document.title !== titled.dataset.liveTitle) document.title = titled.dataset.liveTitle;
+  }
+
+  window.addEventListener("popstate", () => {
+    visiting = true;
+    send({ event: "visit", path: here() });
+  });
 
   function send(fields) {
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -148,6 +180,9 @@
     for (const list of app.querySelectorAll('[data-stick="bottom"][id]')) {
       pinned.set(list.id, list.scrollHeight - list.scrollTop - list.clientHeight < 48);
     }
+    // A field marked `autofocus` that a patch brings in takes the focus, as
+    // it would have on a page load; one that was already there does not.
+    const focusable = new Set([...app.querySelectorAll("[autofocus][id]")].map((field) => field.id));
     const wasOpen = Boolean(app.querySelector("#editor"));
     if (!wasOpen) opener = document.activeElement;
     const template = document.createElement("template");
@@ -157,6 +192,10 @@
     for (const list of app.querySelectorAll('[data-stick="bottom"][id]')) {
       if (pinned.get(list.id) !== false) list.scrollTop = list.scrollHeight;
     }
+    for (const field of app.querySelectorAll("[autofocus][id]")) {
+      if (!focusable.has(field.id)) field.focus();
+    }
+    addressed();
 
     const editor = app.querySelector("#editor");
     if (editor && !wasOpen) {

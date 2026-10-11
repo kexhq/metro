@@ -81,6 +81,11 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   a round trip.
 - Every reply is the live region rendered again; the script patches the page,
   keeping what is being typed.
+- `data-live-path="/channels/general"` on an element of the live region puts
+  that address in the address bar after a render; back and forward send a
+  `visit` event with a `path` field, and the socket is opened with
+  `/live?at=<the page's address>`. `data-live-title` sets the document title.
+- A field with `autofocus` and an id takes the focus when a patch brings it in.
 
 `Metro.Live.Hub` groups connections — by user, by channel, by whatever shares
 data. When a step reports that shared data changed, the rest of the group is
