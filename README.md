@@ -6,9 +6,54 @@ checked by declared validations; sign-in rests on hashed passwords and
 server-side sessions.
 
 Metro was extracted from a working application and holds what that
-application needed and nothing speculative. HTTP is
-[Rodolfo](https://github.com/kexhq/rodolfo)'s for now; the database is
-[Harmat](https://github.com/kexhq/harmat)'s, and Metro does not depend on it.
+application needed and nothing speculative. It routes requests itself, on
+Kex's `Net.HTTP`; the database is [Harmat](https://github.com/kexhq/harmat)'s,
+and Metro does not depend on it.
+
+## Routing
+
+```kex
+let routes = Metro.Router.define do
+  pipeline(:application, [providing(:database, database)])
+  pipeline(:browser, [Metro.Plugs.sameOrigin, Metro.Plugs.unstored])
+  pipeline(:members, [App.Controllers.Application.signedIn()])
+
+  scope "/", via: [:application, :browser, :members] do
+    get("/", ~show)
+    get(App.Paths.channelPath.template, ~show)
+    post("/signout", ~signOut)
+    live "/live" do |request, socket| App.Controllers.Chat.joined(request, socket) end
+    resources("/channels", App.Controllers.Channels.resource)
+  end
+
+  static("public")
+end
+
+routes.start("127.0.0.1", 4000)
+```
+
+- A **pipeline** is a named list of plugs; a **scope** puts a path in front of
+  its routes and runs them through pipelines, after those of the scope around
+  it.
+- A plug and an action are the same thing, `WebRequest -> WebRequest`. A plug
+  notes something for the action (`request.assign(:user, user)`) or answers
+  (`request.redirect("/signin")`), and a request that has been answered goes
+  no further. An action reads (`request.param("name")`, `request.cookie(…)`,
+  `request.assigned(:user)`) and answers (`request.html(…)`,
+  `request.json(…)`, `request.redirect(…)`).
+- A **live** route is a WebSocket behind the same plugs as a page.
+- `resources` declares the usual seven routes for the actions a `Resource`
+  record has.
+- `Metro.Path.define("/:organization/channels/:name")` is an address said
+  once: `.template` for the route, `.filled({…})` for a link,
+  `.captured(address)` to read one back.
+- `routes.call(Metro.WebRequest.asked("GET", "/"))` answers a request without
+  a server, for specs; `routes.listing` is every route, in order.
+- An action that raises, or answers nothing, is a 500, and is logged with the
+  route it was.
+
+Actions are imported by name and referenced bare (`~show`); a reference
+through the module does not resolve when called (kexhq/kex#476).
 
 ## Starting an application
 
@@ -22,7 +67,6 @@ It is a Tey plugin, `metro:app`, run from a package that depends on Metro:
 ```sh
 mkdir chat && cd chat
 tey init chat --app
-tey add rodolfo --git https://github.com/kexhq/rodolfo --branch main
 tey add harmat --git https://github.com/kexhq/harmat --branch database-migrations-repositories
 tey add metro --git https://github.com/akoskovacs/metro --branch main   # asks to approve the plugin
 tey generate metro:app --force     # --force: it replaces what `tey init` wrote

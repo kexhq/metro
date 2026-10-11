@@ -14,8 +14,6 @@ package "__app__" do
   command("rollback", run: "tey run rollback", description: "Undo the newest migration (or the newest N)")
   command("odbc", run: "sh script/setup-odbc.sh db/odbc", description: "Build Erlang's ODBC port program into db/odbc, once")
 
-  # Rodolfo's main, not its 0.2.0 tag: publicFolder is newer than the tag.
-  tey("rodolfo", git: "__RODOLFO__", branch: "main")
   tey("harmat", git: "__HARMAT__", branch: "__HARMAT_BRANCH__")
   tey("metro", git: "__METRO__", branch: "__METRO_BRANCH__")
 end

@@ -13,7 +13,6 @@ module Metro.Generators.App
 
 # Where a new app's dependencies come from.
 record Sources do
-  rodolfo : String = "https://github.com/kexhq/rodolfo"
   harmat : String = "https://github.com/kexhq/harmat"
   harmatBranch : String = "database-migrations-repositories"
   metro : String = "https://github.com/akoskovacs/metro"
@@ -43,7 +42,6 @@ private do
   filled : String -> String -> Sources -> String
   let filled(text, name, sources) do
     text.replace("__APP__", name.upperCase).replace("__App__", titled(name)).replace("__app__", name)
-      .replace("__RODOLFO__", sources.rodolfo)
       .replace("__HARMAT_BRANCH__", sources.harmatBranch).replace("__HARMAT__", sources.harmat)
       .replace("__METRO_BRANCH__", sources.metroBranch).replace("__METRO__", sources.metro)
   end
@@ -52,6 +50,9 @@ private do
   let templates = [
   (".gitignore", Kex.embed("app/.gitignore.tmpl")),
   ("README.md", Kex.embed("app/README.md.tmpl")),
+  ("app/controllers/accounts.kex", Kex.embed("app/app/controllers/accounts.kex.tmpl")),
+  ("app/controllers/application.kex", Kex.embed("app/app/controllers/application.kex.tmpl")),
+  ("app/controllers/home.kex", Kex.embed("app/app/controllers/home.kex.tmpl")),
   ("app/forms/credentials.kex", Kex.embed("app/app/forms/credentials.kex.tmpl")),
   ("app/live/home.kex", Kex.embed("app/app/live/home.kex.tmpl")),
   ("app/live/tab.kex", Kex.embed("app/app/live/tab.kex.tmpl")),

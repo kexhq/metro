@@ -1,0 +1,23 @@
+# The home page, and the socket that keeps it current.
+module App.Controllers.Home
+
+using Metro.WebRequest, only: [WebRequest]
+using App.Controllers.Application, only: [hubFor, userFor, page]
+
+show : WebRequest -> WebRequest
+foul show(request) do
+  let user = userFor(request)
+  return page(request, 200, App.Views.Home.page(user.email, App.Live.Home.markup(user, App.Live.Tab.Tab {})))
+end
+
+# A tab's socket: events in, markup out, until it closes. A person's tabs
+# are one group: what one changes, the others are told of.
+joined : WebRequest -> Net.HTTP.WebSocket.Connection -> Void
+foul joined(request, socket) do
+  let user = userFor(request)
+  Metro.Live.Socket.attached(
+    socket, hubFor(request), user.id, App.Live.Tab.Tab {},
+    do |tab, event| App.Live.Home.handled(tab, event) end,
+    do |tab| App.Live.Home.markup(user, tab) end
+  )
+end

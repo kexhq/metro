@@ -1,142 +1,50 @@
-# Every URL the application answers. This is the one file that touches
-# Rodolfo's router.
+# Every address the application answers, and who gets as far as answering.
 #
-#   everything       Metro.Plugs.sameOrigin: no POST from another site
-#   signed in only   GET /   POST /signout
-#   signed out only  GET /signin   POST /signin   GET /register   POST /register
-#   WS /live         the home page kept current: events in, markup out
-#   GET /metro/live.js   the browser half of a live page, from Metro
-#   GET /*           files from public/
+#   :application   the database and the hub, on every request
+#   :browser       no request from another site; nothing kept by a cache
+#   :members       signed in, or sent to sign in
+#   :guests        signed out, or sent home
 #
-# Who may reach what is said once, by the plug on each scope. Who is asking
-# is a session token in the `__app___session` cookie.
+# Who is asking is a session token in the `__app___session` cookie. It is
+# looked up once, by a plug, and the actions are handed who it was.
 module Config.Routes
 
-using Rodolfo
-using Net.HTTP.WebSocket, only: [Connection]
 using Metro.Live.Hub, only: [Hub]
-using App.Models.User, only: [User]
-using Harmat.Db, only: [Db]
+using Metro.Plugs, only: [providing]
+using Metro.Router, only: [pipeline, scope, get, post, live, static]
 using DB.Store, only: [Store]
+# Actions are named bare, and so imported by name: a reference through the
+# module (`~App.Controllers.Home.show`) does not resolve when it is called
+# (kexhq/kex#476).
+using App.Controllers.Accounts, only: [signInPage, signIn, signOut, registrationPage, register]
+using App.Controllers.Home, only: [show]
 
-let COOKIE = "__app___session"
-
-routes : Server<Store> -> Server<Hub> -> Rodolfo.Router
+routes : Server<Store> -> Server<Hub> -> Metro.Router.Router
 foul routes(store, hub) do
   let database = Harmat.Db.over(DB.Store.gateway(store))
-  Rodolfo.router do
-    plug(Metro.Plugs.sameOrigin)
+  Metro.Router.define do
+    pipeline(:application, [providing(:database, database), providing(:hub, hub)])
+    pipeline(:browser, [Metro.Plugs.sameOrigin, Metro.Plugs.unstored])
+    pipeline(:members, [App.Controllers.Application.signedIn()])
+    pipeline(:guests, [App.Controllers.Application.signedOut()])
 
-    scope "" do
-      plug(signedIn(database))
-
-      get "/" do |env|
-        let user : User = visitor(database, env).try
-        page(App.Views.Home.page(user.email, App.Live.Home.markup(user, App.Live.Tab.Tab {})))
-      end
-
-      post "/signout" do |env|
-        App.Services.Authentication.signOut(database, token(env))
-        Response.Redirect { status: 303, location: "/signin", headers: cookie(Metro.Cookies.cleared(COOKIE)) }
-      end
+    scope "/", via: [:application, :browser, :guests] do
+      get("/signin", ~signInPage)
+      post("/signin", ~signIn)
+      get("/register", ~registrationPage)
+      post("/register", ~register)
     end
 
-    scope "" do
-      plug(signedOut(database))
-
-      get "/signin" do
-        page(App.Views.Auth.signin("", []))
-      end
-
-      post "/signin" do |env|
-        let email = env.form("email").or("")
-        match App.Services.Authentication.signIn(database, email, env.form("password").or("")) do
-          Ok(token) => entered(env, token)
-          Error(problems) => Response.HTML { status: 422, body: App.Views.Auth.signin(email, problems) }
-        end
-      end
-
-      get "/register" do
-        page(App.Views.Auth.register("", []))
-      end
-
-      post "/register" do |env|
-        let email = env.form("email").or("")
-        match App.Services.Authentication.register(database, email, env.form("password").or("")) do
-          Ok(token) => entered(env, token)
-          Error(problems) => Response.HTML { status: 422, body: App.Views.Auth.register(email, problems) }
-        end
-      end
-    end
-
-    # A `ws` route is outside the plug stack, so it asks the same two
-    # questions itself and closes the socket on a wrong answer.
-    ws "/live" do |env, socket|
-      let user = Metro.Plugs.trusted?(env) then visitor(database, env) else None
-      if user.none?
-        socket.close
-      else
-        served(hub, socket, user.try)
-      end
+    scope "/", via: [:application, :browser, :members] do
+      get("/", ~show)
+      post("/signout", ~signOut)
+      # The home page kept current: events in, markup out. Behind the same
+      # plugs as the page, so a socket from another site, or from nobody, is
+      # refused.
+      live "/live" do |request, socket| App.Controllers.Home.joined(request, socket) end
     end
 
     Metro.Live.Client.route()
-    publicFolder("public")
-  end
-end
-
-# --- Plugs ------------------------------------------------------------------
-
-# Lets a signed-in request through; sends anyone else to sign in.
-signedIn : Db -> Rodolfo.Plug
-foul signedIn(database) = Plug.around do |inner, env|
-  if visitor(database, env).set?
-    inner(env)
-  else
-    redirectTo("/signin")
-  end
-end
-
-# The reverse, for the sign-in and registration pages.
-signedOut : Db -> Rodolfo.Plug
-foul signedOut(database) = Plug.around do |inner, env|
-  if visitor(database, env).set?
-    redirectTo("/")
-  else
-    inner(env)
-  end
-end
-
-private do
-  # The session token a request carries, if any.
-  token : Context -> String?
-  let token(env) = Metro.Plugs.cookie(env, COOKIE)
-
-  # Who is signed in on this request.
-  visitor : Db -> Context -> User?
-  foul visitor(database, env) = App.Services.Authentication.current(database, token(env))
-
-  foul served(hub: Server<Hub>, socket: Connection, user: User) -> Void do
-    Metro.Live.Socket.attached(
-      socket, hub, user.id, App.Live.Tab.Tab {},
-      do |tab, event| App.Live.Home.handled(tab, event) end,
-      do |tab| App.Live.Home.markup(user, tab) end
-    )
-  end
-
-  # A page that must not be kept by a cache: it is one person's.
-  page : String -> Rodolfo.Reply
-  let page(body) = Response.HTML { body: body, headers: Net.HTTP.Headers.empty.add("Cache-Control", "no-store").or(Net.HTTP.Headers.empty) }
-
-  cookie : String -> Net.HTTP.Headers
-  let cookie(value) = Net.HTTP.Headers.empty.add("Set-Cookie", value).or(Net.HTTP.Headers.empty)
-
-  # Signed in: hand the browser its session and send it home. `Secure` goes
-  # on the cookie when the request arrived over HTTPS, as a proxy reports it.
-  entered : Context -> String -> Rodolfo.Reply
-  let entered(env, token) do
-    let secure? = env.request.headers.get("X-Forwarded-Proto") == Just("https")
-    let issued = Metro.Cookies.issued(COOKIE, token, App.Services.Authentication.LIFETIME, secure?)
-    Response.Redirect { status: 303, location: "/", headers: cookie(issued) }
+    static("public")
   end
 end
