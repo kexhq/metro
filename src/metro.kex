@@ -15,8 +15,8 @@
 #   Metro.Decimal        decimals as scaled integers
 #   Metro.Environment    METRO_ENV, PORT and HOST: where the process runs
 #
-# HTTP is Rodolfo's for now; it is used in `Metro.Plugs` and
-# `Metro.Live.Client` only.
+# Requests are routed by `Metro.Router`, on Kex's `Net.HTTP`. README.md is
+# the guide.
 module Metro do
   export Metro.Live.Socket
   export Metro.Live.Hub

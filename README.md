@@ -10,11 +10,25 @@ application needed and nothing speculative. It routes requests itself, on
 Kex's `Net.HTTP`; the database is [Harmat](https://github.com/kexhq/harmat)'s,
 and Metro does not depend on it.
 
+| | |
+| --- | --- |
+| `Metro.Router`, `Metro.Path` | routes, pipelines and scopes; addresses said once |
+| `Metro.WebRequest`, `Metro.Plugs` | what a plug and an action are handed, and the plugs every application wants |
+| `Metro.Live.Socket`, `Hub`, `Presence`, `Client` | live pages: one tab's WebSocket, telling the other tabs, "is typing", and the browser script |
+| `Metro.Validation` | `validates(…)` rules, checked into a changeset |
+| `Metro.Auth.Password`, `Metro.Auth.Token`, `Metro.Cookies` | password hashes, session tokens, cookies |
+| `Metro.Environment` | `METRO_ENV`, `PORT` and `HOST` |
+| `Metro.Clock`, `Metro.Id` | the time as a number; ids for rows |
+| `Metro.Assets`, `Metro.Static` | stylesheets addressed by their contents; files of `public/` |
+| `Metro.Decimal` | decimals as scaled integers |
+
+It needs Kex 0.4.0-rc.1 or newer.
+
 ## Routing
 
 ```kex
 let routes = Metro.Router.define do
-  pipeline(:application, [providing(:database, database)])
+  pipeline(:application, [providing(:hub, hub)])
   pipeline(:browser, [Metro.Plugs.sameOrigin, Metro.Plugs.unstored])
   pipeline(:members, [App.Controllers.Application.signedIn()])
 
@@ -49,25 +63,80 @@ routes.start("127.0.0.1", 4000)
   `.captured(address)` to read one back.
 - `routes.call(Metro.WebRequest.asked("GET", "/"))` answers a request without
   a server, for specs; `routes.listing` is every route, in order.
+- `Metro.Plugs.providing(:hub, hub)` notes something on every request, which
+  an action reads back with `request.assigned(:hub)`; `sameOrigin` refuses a
+  form or a socket from another site, and `unstored` tells the browser not
+  to keep a page that is one person's.
+- `static("public")` serves the files of a directory, with what a browser
+  needs to keep them; `Metro.Assets.marked(markup, "public", ["/app.css"])`
+  puts a mark of a file's contents on its address, so that the address
+  changes exactly when the file does.
 - An action that raises, or answers nothing, is a 500, and is logged with the
   route it was.
 
 Actions are imported by name and referenced bare (`~show`); a reference
 through the module does not resolve when called (kexhq/kex#476).
 
+### The database is not passed along
+
+Harmat's queries reach the database through a capability,
+`Harmat.Connection`, and not through something on the request. An
+application installs its database around *building* its routes as well as
+serving them:
+
+```kex
+with Harmat.Connection = DB.Store.StoreConnection { store: store } do
+  let site = Config.Routes.routes(hub)
+  site.start(host, port).try
+end
+```
+
+An action reaches the connection that was in force when its route was
+written, not the one in force when a request arrives — so routes built
+outside the `with` answer "no database connected".
+
+## Where the application is running
+
+```kex
+match Metro.Environment.current() do
+  Ok(Production) => …
+  Ok(environment) => IO.printLine("running in ${environment.label}")
+  Error(reason) => …      # METRO_ENV names none of the three
+end
+
+Metro.Environment.port()   # PORT, or 4000
+Metro.Environment.host()   # HOST, or 127.0.0.1
+```
+
+| Variable | |
+| --- | --- |
+| `METRO_ENV` | `development` (the default), `test` or `production`; anything else is an error, not a guess |
+| `PORT` | the port to listen on; 4000 unless set |
+| `HOST` | the address to bind; 127.0.0.1 unless set |
+
+An application does not name an environment variable of its own for this:
+what differs between environments — which database, say — it decides from
+`Metro.Environment.current()`, in its `config/`.
+
 ## Starting an application
 
 Metro ships a generator for the skeleton every application shares: the
 Rails-style layout (`app/`, `config/`, `db/`), a database store with users
 and sessions migrations, registration and sign-in behind plugs, one live page
-to start from, a setup script and a smoke spec.
+to start from, a setup script, a smoke spec, and a `Dockerfile` and
+`docker-compose.yml` that run the application beside PostgreSQL.
+
+> The generated Kex sources are behind Harmat: they still hand a database
+> to every action, as Harmat needed before `Harmat.Connection`. Until the
+> templates are brought up — the way [Slick](https://github.com/akoskovacs/slick)
+> was — a generated application does not build against the current Harmat.
 
 It is a Tey plugin, `metro:app`, run from a package that depends on Metro:
 
 ```sh
 mkdir chat && cd chat
 tey init chat --app
-tey add harmat --git https://github.com/kexhq/harmat --branch database-migrations-repositories
+tey add harmat --git https://github.com/kexhq/harmat --branch main
 tey add metro --git https://github.com/akoskovacs/metro --branch main   # asks to approve the plugin
 tey generate metro:app --force     # --force: it replaces what `tey init` wrote
 sh script/setup.sh                 # dependencies, the ODBC port program
@@ -94,14 +163,17 @@ A live page is three things you supply — a starting state, a function from
 against a WebSocket:
 
 ```kex
-ws "/live" do |env, socket|
+live "/live" do |request, socket|
   Metro.Live.Socket.attached(
     socket, hub, user.id, Tab {},
-    do |tab, event| handled(db, tab, event) end,   # -> (Tab, Bool): next state, did shared data change?
-    do |tab| markup(db, tab) end                   # -> String: the live region
+    do |tab, event| handled(tab, event) end,   # -> (Tab, Bool): next state, did shared data change?
+    do |tab| markup(tab) end                   # -> String: the live region
   )
 end
 ```
+
+`live` is a route like any other: the request has been through the scope's
+plugs before the socket is opened, so who is asking is already known.
 
 The browser half is one script, served by `Metro.Live.Client.route()`:
 
@@ -135,7 +207,9 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
 - `data-live-enter` on a textarea of a live form makes Enter send the form and
   Shift+Enter start a new line.
 - `data-live-keep` on an element keeps a patch from writing over it: the
-  `#status` request indicator, when it is inside the live region.
+  `#status` request indicator, when it is inside the live region, or a form
+  whose fields should keep what is typed in them while the page changes
+  around it.
 - `<details data-menu>` is a menu: it stays open across patches, and closes
   when something in it is chosen, on a click elsewhere, or on Escape.
 - `data-live-typing` on a live form sends a `typing` event, at most every few
@@ -177,14 +251,32 @@ Metro.Auth.Password.matches?(password, stored)        # constant-time
 let token = Metro.Auth.Token.fresh()                  # give this to the browser
 Metro.Auth.Token.digest(token)                        # store this
 
-Metro.Cookies.issued("session", token, 2592000, secure?)   # HttpOnly; SameSite=Lax
-Metro.Plugs.cookie(env, "session")
+request.withCookie(Metro.Cookies.issued("session", token, 2592000, secure?))   # HttpOnly; SameSite=Lax
+request.cookie("session")
+request.withCookie(Metro.Cookies.cleared("session"))
 
-plug(Metro.Plugs.sameOrigin)                          # no POST from another site
+pipeline(:browser, [Metro.Plugs.sameOrigin])          # no POST from another site
 ```
 
 Metro supplies the pieces; where users and sessions are stored is the
 application's.
+
+## Time and ids
+
+```kex
+Metro.Clock.seconds()             # since 1970: when a session expires
+Metro.Clock.milliseconds()        # when a message was sent, when a note lapses
+Metro.Clock.microseconds()
+
+Metro.Id.generate(prefix: "u")    # "u1791741238785550-6": a new row's id
+Metro.Id.serial()                 # 6: a tab, a seat — unique while this node runs
+```
+
+The clock is the standard library's (`Time.Clock`), so a spec that replaces
+it moves these too. A generated id is its kind's prefix, the microsecond it
+was made in and a serial number: the prefix says what it is an id of
+wherever it turns up, and the time keeps ids of one kind in the order they
+were made.
 
 ## Also
 
@@ -196,8 +288,8 @@ application's.
 Localization: every message Metro produces (validation errors, the
 same-origin refusal) and every generated page is English text in the code.
 Components and a view tree, diffing on the server, row-level sync, sessions
-and CSRF as one construct, a router of its own, generators beyond `app`. See the plan in
-Kex's `docs/web-stack-plan.md`.
+and CSRF as one construct, generators beyond `app`. See the plan in Kex's
+`docs/web-stack-plan.md`.
 
 ## Develop
 
