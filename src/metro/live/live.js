@@ -105,6 +105,14 @@
       if (field) insertAt(field, inserter.dataset.insert);
       return;
     }
+    // `data-wrap` puts a mark either side of what is selected in a field — a
+    // bold button over a message box — or of the caret when nothing is.
+    const wrapper = click.target.closest("[data-wrap]");
+    if (wrapper) {
+      const field = app.querySelector(wrapper.dataset.target);
+      if (field) wrapWith(field, wrapper.dataset.wrap);
+      return;
+    }
     const button = click.target.closest("[data-event]");
     if (!button) return;
     clearTimeout(typing);
@@ -118,6 +126,23 @@
     field.focus();
     field.setSelectionRange(start + text.length, start + text.length);
   }
+
+  function wrapWith(field, mark) {
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? field.value.length;
+    field.value = field.value.slice(0, start) + mark + field.value.slice(start, end) + mark + field.value.slice(end);
+    field.focus();
+    field.setSelectionRange(start + mark.length, end + mark.length);
+  }
+
+  // `data-live-enter` on a textarea of a live form: Enter sends the form, as
+  // it does in a one-line field, and Shift+Enter starts a new line.
+  app.addEventListener("keydown", (key) => {
+    if (key.key !== "Enter" || key.shiftKey || key.isComposing) return;
+    if (!key.target.matches || !key.target.matches("textarea[data-live-enter]")) return;
+    key.preventDefault();
+    if (key.target.form) key.target.form.requestSubmit();
+  });
 
   // While the dialog is open the keyboard belongs to it: Escape dismisses it
   // and Tab goes round its own controls instead of out to the page behind.

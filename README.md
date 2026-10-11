@@ -86,6 +86,10 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   `visit` event with a `path` field, and the socket is opened with
   `/live?at=<the page's address>`. `data-live-title` sets the document title.
 - A field with `autofocus` and an id takes the focus when a patch brings it in.
+- `data-wrap="*" data-target="#box"` on a button puts the mark either side of
+  the selection in a field.
+- `data-live-enter` on a textarea of a live form makes Enter send the form and
+  Shift+Enter start a new line.
 
 `Metro.Live.Hub` groups connections — by user, by channel, by whatever shares
 data. When a step reports that shared data changed, the rest of the group is
