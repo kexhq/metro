@@ -1,0 +1,28 @@
+describe("Metro.Path") do
+  it("writes an address from its parts and reads it back") do
+    let channel = Metro.Path.define("/:organization/channels/:name")
+    Assert.equal(channel.filled({"organization": "acme", "name": "general"}), "/acme/channels/general")
+    Assert.equal(channel.captured("/acme/channels/general"), Just({"organization": "acme", "name": "general"}))
+    Assert.equal(channel.captured("/acme/channels/general?thread=m1"), Just({"organization": "acme", "name": "general"}))
+  end
+
+  it("does not fit an address of another shape") do
+    let channel = Metro.Path.define("/:organization/channels/:name")
+    Assert.equal(channel.captured("/acme/dm/u7"), None)
+    Assert.equal(channel.captured("/acme/channels"), None)
+    Assert.equal(channel.captured("/acme/channels/general/more"), None)
+    Assert.equal(Metro.Path.define("/").captured("/"), Just({}))
+  end
+
+  it("takes all that is left with a star") do
+    Assert.equal(Metro.Path.define("/files/*rest").captured("/files/a/b.css"), Just({"rest": "a/b.css"}))
+  end
+
+  it("reads and writes a query string") do
+    Assert.equal(Metro.Path.query("/acme/channels/general?thread=m1&x=a+b", "thread"), Just("m1"))
+    Assert.equal(Metro.Path.query("/acme/channels/general?thread=m1&x=a+b", "x"), Just("a b"))
+    Assert.equal(Metro.Path.query("/acme/channels/general", "thread"), None)
+    Assert.equal(Metro.Path.asking("/a", [("thread", "m1"), ("empty", "")]), "/a?thread=m1")
+    Assert.equal(Metro.Path.asking("/a", [("thread", "")]), "/a")
+  end
+end

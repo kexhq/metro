@@ -1,0 +1,130 @@
+# Files of a folder, served: the stylesheet, the images. A path is only ever
+# answered from inside the folder, however it is spelled; a file is sent with
+# its type, and with the validators that let a browser keep its copy (`ETag`,
+# `Last-Modified`) and be told it is still good (304).
+#
+# `Metro.Router`'s `static "public"` is the way in.
+module Metro.Static
+
+using Net.HTTP, only: [Headers, Request]
+using Metro.Connection, only: [Connection]
+
+# The media type for a file name, by its extension.
+mimeType : String -> String
+let mimeType(path) do
+  mimeTypes().get(FS.Path.extension(path).lowerCase).or("application/octet-stream")
+end
+
+# Answers with a file of a directory, a 304 when the browser's copy is still
+# good, or a 404 — also for a path that would leave the directory.
+within : Connection -> String -> String -> Connection
+foul within(connection, directory, relative) do
+  match contained(directory, relative) do
+    Just(real) => return regular(connection, real, mimeType(relative))
+    None => return connection.plain(404, "Not Found")
+  end
+end
+
+private do
+  foul contained(directory: String, relative: String) -> String? do
+    match (FS.File.canonical(directory), FS.File.canonical("${directory}/${relative}")) do
+      (Ok(root), Ok(real)) => real.startsWith?(beneath(root)) then Just(real) else None
+      _ => None
+    end
+  end
+
+  let beneath(root: String) -> String = root.endsWith?("/") then root else "${root}/"
+
+  foul regular(connection: Connection, path: String, contentType: String) -> Connection do
+    match FS.File.info(path) do
+      Ok(info) => do
+        return connection.plain(404, "Not Found") if info.kind != :file
+        return answered(connection, path, info, contentType)
+      end
+      Error(_) => return connection.plain(404, "Not Found")
+    end
+  end
+
+  foul answered(connection: Connection, path: String, info: FS.FileInfo, contentType: String) -> Connection do
+    let tag = entityTag(info)
+    let stamp = httpDate(info.modified)
+    let validated = connection.withHeader("ETag", tag).withHeader("Last-Modified", stamp)
+    return validated.withoutBody(304) if unchanged?(connection.request, tag, stamp)
+
+    match FS.File.readBytes(path) do
+      Ok(content) => return validated.bytes(200, content, contentType)
+      Error(_) => return connection.plain(404, "Not Found")
+    end
+  end
+
+  let unchanged?(request: Request<Binary>, tag: String, stamp: String) -> Bool do
+    return false if request.method != "GET" && request.method != "HEAD"
+    match request.headers.get("If-None-Match") do
+      Just(sent) => sent.split(",").map { |candidate| candidate.trim }.any? { |candidate|
+        candidate == "*" || opaque(candidate) == opaque(tag)
+      }
+      None => request.headers.get("If-Modified-Since") == Just(stamp)
+    end
+  end
+
+  # An entity tag without its weakness marker: +If-None-Match+ compares
+  # weakly, so +W/"a"+ and +"a"+ are the same tag.
+  let opaque(tag: String) -> String = tag.startsWith?("W/") then tag.drop(2) else tag
+
+  # Weak, because size and modification time to the second can miss an edit
+  # that changes neither.
+  let entityTag(info: FS.FileInfo) -> String = "W/\"${info.size}-${info.modified.epochSeconds}\""
+
+  # An instant as HTTP writes one (RFC 9110 §5.6.7): +Sun, 06 Nov 1994
+  # 08:49:37 GMT+. +FS.File.info+ reports modification times at UTC already.
+  let httpDate(moment: DateTime) -> String do
+    let date = moment.date
+    let time = moment.time
+    let day = "${date.weekday.name.take(3)}, ${padded(date.day)}"
+    let clock = "${padded(time.hour)}:${padded(time.minute)}:${padded(time.second)}"
+    "${day} ${monthName(date.month)} ${date.year} ${clock} GMT"
+  end
+
+  let padded(number: Integer) -> String = number < 10 then "0${number}" else "${number}"
+
+  let monthName(month: Integer) -> String do
+    let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    names.at(month - 1).or("Jan")
+  end
+
+  let mimeTypes -> Map<String, String> = {
+    ".html": "text/html; charset=utf-8",
+    ".htm": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".json": "application/json",
+    ".map": "application/json",
+    ".webmanifest": "application/manifest+json",
+    ".xml": "application/xml; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".avif": "image/avif",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".ttf": "font/ttf",
+    ".otf": "font/otf",
+    ".pdf": "application/pdf",
+    ".zip": "application/zip",
+    ".gz": "application/gzip",
+    ".wasm": "application/wasm",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm"
+  }
+end

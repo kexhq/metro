@@ -11,7 +11,7 @@
 # and the server answers the WebSocket at `/live` with `Metro.Live.Socket`.
 module Metro.Live.Client
 
-using Rodolfo
+using Metro.Connection, only: [Connection]
 
 # Where the script is served.
 let PATH = "/metro/live.js"
@@ -22,7 +22,12 @@ script : String
 let script = Kex.embed("live.js")
 
 # The route to put in a router: `Metro.Live.Client.route()`.
-route : Rodolfo.Entry
-let route = get PATH do
-  Response.Text { body: Metro.Live.Client.script, headers: Net.HTTP.Headers.empty.add("Content-Type", "text/javascript; charset=utf-8").or(Net.HTTP.Headers.empty) }
-end
+route : Metro.Router.Entry
+let route = Metro.Router.get(PATH, do |connection|
+  connection.withHeader("Content-Type", "text/javascript; charset=utf-8").plain(Metro.Live.Client.script)
+end)
+
+# The script's address with a mark of what is in it, so a browser that has
+# kept an old copy asks again when it changes: `<script src="…">`.
+address : String
+let address = "${PATH}?v=${Digest.sha256(Metro.Live.Client.script).take(12)}"

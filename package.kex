@@ -20,9 +20,4 @@ package "metro" do
   # an app without first making a package for it:
   #   tey new-app ../chat
   command("new-app", run: "generators/new.kex", description: "Create a new Metro application in a directory")
-
-  # Rodolfo's main, not its 0.2.0 tag: publicFolder and plugs' current form
-  # are newer than the tag. Every package of an application has to ask for
-  # Rodolfo the same way, so generated apps say the same.
-  tey("rodolfo", git: "https://github.com/kexhq/rodolfo", branch: "main")
 end

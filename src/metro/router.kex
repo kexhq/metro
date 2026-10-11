@@ -1,0 +1,255 @@
+# Where a request goes.
+#
+#   let routes = Metro.Router.define do
+#     pipeline(:browser, [Metro.Plugs.sameOrigin, signedIn])
+#     pipeline(:api, [bearer])
+#
+#     scope "/api", via: [:api] do
+#       get("/me", ~App.Controllers.Api.whoami)
+#       post("/channels/:name/messages", ~App.Controllers.Api.posted)
+#     end
+#
+#     scope "/", via: [:browser] do
+#       get("/", ~App.Controllers.Chat.show)
+#       live("/live", ~App.Live.Chat.joined)
+#       resources("/channels", App.Controllers.Channels.resource)
+#       get "/about" do |connection| connection.html(App.Views.About.page()) end
+#     end
+#
+#     static("public")
+#   end
+#
+# A **pipeline** is a named list of plugs. A **scope** puts a path in front
+# of its routes and runs them through pipelines: its own after those of the
+# scope around it. A **route** names the action — any `Connection -> Connection`, a
+# function or a block — that answers once the plugs have let the request
+# through; a plug that answers ends it there. A **live** route is a
+# WebSocket behind the same plugs: a plug that refuses the request refuses
+# the socket.
+#
+# Earlier routes win. `routes.start(host, port)` serves them.
+module Metro.Router
+
+using Net.HTTP, only: [Request, Context, Headers, Route, Server]
+using Net.HTTP.WebSocket, only: [WebSocket, Accept]
+using Net.Socket
+using Metro.Connection, only: [Connection, Plug]
+
+# A WebSocket's handler: the request it was opened with, plugs applied, and
+# the open socket.
+type SocketHandler = Connection -> Net.HTTP.WebSocket.Connection -> Void
+
+record PipelineEntry do
+  label : Atom
+  plugs : [Plug]
+end
+
+record RouteEntry do
+  verb : String
+  path : String
+  action : Plug
+end
+
+record LiveEntry do
+  path : String
+  handler : SocketHandler
+end
+
+record StaticEntry do
+  directory : String
+end
+
+record ScopeEntry do
+  prefix : String
+  through : [Atom]
+  children : [Entry]
+end
+
+# One line of a router or scope.
+type Entry = PipelineEntry | RouteEntry | LiveEntry | StaticEntry | ScopeEntry
+
+# The usual seven actions of a thing kept somewhere, any of them left out:
+#
+#   let resource = Resource { index: Just(~index), create: Just(~create) }
+#
+#   index   GET    /things          show    GET    /things/:id
+#   new     GET    /things/new      edit    GET    /things/:id/edit
+#   create  POST   /things          update  PUT    /things/:id   (and PATCH)
+#                                   delete  DELETE /things/:id
+record Resource do
+  index : Plug? = None
+  new : Plug? = None
+  create : Plug? = None
+  show : Plug? = None
+  edit : Plug? = None
+  update : Plug? = None
+  delete : Plug? = None
+end
+
+record Router do
+  entries : [Entry]
+end
+
+define : Block<[Entry]> -> Router
+let define(entries) = Router { entries: entries() }
+
+pipeline : Atom -> [Plug] -> Entry
+let pipeline(label, plugs) = PipelineEntry { label: label, plugs: plugs }
+
+scope : String -> Block<[Entry]> -> Entry
+let scope(prefix, entries) = ScopeEntry { prefix: prefix, through: [], children: entries() }
+
+scope : String -> [Atom] -> Block<[Entry]> -> Entry
+let scope(prefix, via: [Atom], entries) = ScopeEntry { prefix: prefix, through: via, children: entries() }
+
+route : String -> String -> Plug -> Entry
+let route(verb, path, action) = RouteEntry { verb: verb, path: path, action: action }
+
+get : String -> Plug -> Entry
+let get(path, action) = route("GET", path, action)
+
+post : String -> Plug -> Entry
+let post(path, action) = route("POST", path, action)
+
+put : String -> Plug -> Entry
+let put(path, action) = route("PUT", path, action)
+
+patch : String -> Plug -> Entry
+let patch(path, action) = route("PATCH", path, action)
+
+delete : String -> Plug -> Entry
+let delete(path, action) = route("DELETE", path, action)
+
+live : String -> SocketHandler -> Entry
+let live(path, handler) = LiveEntry { path: path, handler: handler }
+
+# Serves the files of a directory: `/app.css` is `<directory>/app.css`. Put
+# it last — it matches every GET nothing above it did.
+static : String -> Entry
+let static(directory) = StaticEntry { directory: directory }
+
+resources : String -> Resource -> Entry
+let resources(path, actions) = ScopeEntry { prefix: path, through: [], children: [
+  offered("GET", "/", actions.index), offered("GET", "/new", actions.new), offered("POST", "/", actions.create),
+  offered("GET", "/:id", actions.show), offered("GET", "/:id/edit", actions.edit),
+  offered("PUT", "/:id", actions.update), offered("PATCH", "/:id", actions.update), offered("DELETE", "/:id", actions.delete)
+].flatMap { |found| found } }
+
+# One route as it is served: its whole path, and every plug in front of it.
+record Flat do
+  verb : String
+  path : String
+  plugs : [Plug]
+  action : Plug? = None
+  socket : SocketHandler? = None
+  directory : String = ""
+end
+
+make Router do
+  # Every route, outermost scope first, in the order requests try them.
+  let table -> [Flat] = flattened(@entries, "", [], [])
+
+  # What `tey routes` would print: verb and path, one a line.
+  let listing -> [String] = this.table.map { |flat| "${flat.verb} ${flat.path}" }
+
+  # Answers a request without a server: for specs, and for nothing else. The
+  # matching here is this module's own and simpler than the server's.
+  foul call(connection: Connection) -> Connection do
+    match this.table.find { |flat| flat.socket.none? && flat.verb == connection.verb && Metro.Path.define(flat.path).captured(connection.path).set? } do
+      Just(flat) => return ran(flat, Connection { ...connection, captures: Metro.Path.define(flat.path).captured(connection.path).or({}) })
+      None => return connection.plain(404, "Not Found")
+    end
+  end
+
+  foul start(host: String, port: Integer) -> Result<Void, NetError> do
+    Server.serve(Net.Socket.TCP.Endpoint.host(host, Net.Port.from(port).try), this.served)
+  end
+
+  foul served -> Net.HTTP.Router = Net.HTTP.Router { routes: this.table.map { |flat| routed(flat) } }
+end
+
+private do
+  offered : String -> String -> Plug? -> [Entry]
+  let offered(verb, path, None) = []
+  let offered(verb, path, Just(action)) = [RouteEntry { verb: verb, path: path, action: action }]
+
+  # `known` is every pipeline declared so far, by name; `stack` the plugs of
+  # the scopes around.
+  flattened : [Entry] -> String -> [Plug] -> [PipelineEntry] -> [Flat]
+  let flattened(entries, prefix, stack, inherited) do
+    let known = inherited + entries.flatMap { |entry|
+      match entry do
+        PipelineEntry { label, plugs } => [PipelineEntry { label: label, plugs: plugs }]
+        _ => []
+      end
+    }
+    entries.flatMap { |entry|
+      match entry do
+        RouteEntry { verb, path, action } => [Flat { verb: verb, path: joined(prefix, path), plugs: stack, action: Just(action) }]
+        LiveEntry { path, handler } => [Flat { verb: "GET", path: joined(prefix, path), plugs: stack, socket: Just(handler) }]
+        StaticEntry { directory } => [Flat { verb: "GET", path: joined(prefix, "/*path"), plugs: stack, directory: directory }]
+        ScopeEntry { prefix: inner, through, children } => flattened(children, joined(prefix, inner), stack + piped(through, known), known)
+        _ => []
+      end
+    }
+  end
+
+  # The plugs of the named pipelines, in the order named. A name nothing
+  # declared is a mistake in the router, and stops it being built.
+  piped : [Atom] -> [PipelineEntry] -> [Plug]
+  let piped(names, known) = names.flatMap { |name|
+    match known.find { |pipeline| pipeline.label == name } do
+      Just(found) => found.plugs
+      None => [do |connection| connection.plain(500, "Metro.Router: no pipeline is called ${name}") end]
+    end
+  }
+
+  joined : String -> String -> String
+  let joined(prefix, path) do
+    let base = prefix.endsWith?("/") then prefix.take(prefix.length - 1) else prefix
+    let rest = path.startsWith?("/") then path else "/${path}"
+    let whole = "${base}${rest}"
+    let trimmed = whole.length > 1 && whole.endsWith?("/") then whole.take(whole.length - 1) else whole
+    trimmed.empty? then "/" else trimmed
+  end
+
+  # The plugs in turn, then the action — or the file — unless one of the
+  # plugs answered. Something raised anywhere in it is a 500, and is said.
+  foul ran(flat: Flat, connection: Connection) -> Connection do
+    let passed = flat.plugs.reduce(connection) { |current, plug| current.sent? then current else plug(current) }
+    return passed if passed.sent?
+
+    match flat.action do
+      Just(action) => do
+        let answer = action(passed)
+        return answer if answer.sent?
+        IO.printError("Metro: ${flat.verb} ${flat.path} did not write a response\n")
+        return answer.plain(500, "Internal Server Error")
+      end
+      None => return Metro.Static.within(passed, flat.directory, passed.captures.get("path").or(""))
+    end
+  rescue |error|
+    IO.printError("Metro: ${flat.verb} ${flat.path} raised ${error}\n")
+    return connection.plain(500, "Internal Server Error")
+  end
+
+  foul routed(flat: Flat) -> Route = Route {
+    method: flat.verb,
+    path: flat.path,
+    handler: do |request, context|
+      let matched : Net.HTTP.RouteContext = context.route
+      let connection = Connection { request: request, captures: matched.parameters }
+      match flat.socket do
+        None => written(ran(flat, connection))
+        Just(handler) => do
+          # The plugs decide before the socket opens: one that answers has
+          # refused it, and its answer is what the browser gets.
+          let passed = flat.plugs.reduce(connection) { |current, plug| current.sent? then current else plug(current) }
+          passed.sent? then written(passed) else WebSocket.upgrade(request, do |handshake| Accept(do |socket| handler(passed, socket) end, Headers.empty, None) end)
+        end
+      end
+    end
+  }
+
+  foul written(connection: Connection) -> Net.HTTP.Response<Binary> = Net.HTTP.Response.binary(connection.code, connection.payload, connection.outgoing)
+end

@@ -1,0 +1,176 @@
+# One request on its way to becoming a response.
+#
+# A `Connection` is handed down a pipeline of plugs and then to an action. Each
+# takes it and gives one back: with something noted on it for whoever comes
+# next (`assign`), or with the response written (`html`, `json`,
+# `redirect`…). Once a response is written the request is over — nothing
+# further down is run — so a plug refuses a request by answering it.
+#
+#   foul show(connection: Connection) -> Connection do
+#     let user : User = connection.assigned(:user).try
+#     connection.html(App.Views.Chat.page(user))
+#   end
+module Metro.Connection
+
+using Net.HTTP, only: [Request, Headers]
+
+record Connection do
+  request : Request<Binary>
+  # What the route's path captured: `:name` in "/channels/:name".
+  captures : {String: String} = {}
+  # What plugs have noted for the action: the signed-in user, the database.
+  assigns : {Atom: Any} = {}
+  # The response, once `sent?`.
+  code : Integer = 200
+  outgoing : Headers = Headers.empty
+  payload : Binary = Binary.empty
+  sent? : Bool = false
+end
+
+# What a plug and an action both are.
+type Plug = Connection -> Connection
+
+# Makes a plug of a block, and says so to the type checker:
+#
+#   let stamped = plug do |connection| connection.withHeader("X-Stamped", "yes") end
+plug : Plug -> Plug
+let plug(body) = body
+
+make Connection do
+  # --- The request ------------------------------------------------------------
+
+  let verb -> String = @request.method
+
+  # The address asked for, with its query string.
+  let target -> String = @request.target.string
+
+  # The address without the query string.
+  let path -> String = @request.target.string.split("?").first.or("/")
+
+  # A request header, or `None`.
+  let header(name: String) -> String? = @request.headers.get(name)
+
+  # A cookie of the request, or `None`.
+  let cookie(name: String) -> String? = Metro.Cookies.read(@request.headers.get("Cookie"), name)
+
+  # What the request says under a name, wherever it says it: the route's
+  # captures first, then the query string, then the body — a form's fields,
+  # or the top level of a JSON object.
+  let param(name: String) -> String? do
+    match @captures.get(name) do
+      Just(captured) => return Just(captured)
+      None => match this.query(name) do
+        Just(asked) => return Just(asked)
+        None => return this.field(name)
+      end
+    end
+  end
+
+  # A field of the query string. `+` is a space, as a browser's form sends it.
+  let query(name: String) -> String? = named(decoded(@request.target.string.split("?").drop(1).join("?")), name)
+
+  # A field of the body: of a JSON object when the body is one, and of a form
+  # otherwise. A JSON value that is not text is given as it would be written.
+  let field(name: String) -> String? do
+    let text = this.text.trim
+    return named(decoded(text), name) if text.take(1) != "{"
+
+    match JSON.parse(text) do
+      Ok(value) => do
+        let fields : {String: Any} = value
+        return fields.get(name).map { |found| "${found}" }
+      end
+      Error(_) => return None
+    end
+  end
+
+  # A field of a JSON body that is a list; empty when there is no such list.
+  let list(name: String) -> [Any] do
+    match JSON.parse(this.text) do
+      Ok(value) => do
+        let fields : {String: Any} = value
+        let found : [Any] = fields.get(name).or([])
+        return found
+      end
+      Error(_) => return []
+    end
+  end
+
+  # The body as text; "" when it is not text.
+  let text -> String = @request.body.to(String).or("")
+
+  # --- What plugs leave for the action ----------------------------------------
+
+  let assign(key: Atom, value: Any) -> Connection = Connection { ...this, assigns: @assigns.put(key, value) }
+
+  # What was assigned under a key. Annotate where it lands:
+  #   let user : User = connection.assigned(:user).try
+  let assigned(key: Atom) -> Any? = @assigns.get(key)
+
+  # --- The response -----------------------------------------------------------
+
+  # Adds a response header. Call it before the response is written or after:
+  # it is the same response either way.
+  let withHeader(name: String, value: String) -> Connection = Connection { ...this, outgoing: @outgoing.add(name, value).or(@outgoing) }
+
+  # Adds a `Set-Cookie` line: `Metro.Cookies.issued(…)`.
+  let withCookie(line: String) -> Connection = this.withHeader("Set-Cookie", line)
+
+  let html(markup: String) -> Connection = this.answered(200, markup, "text/html; charset=utf-8")
+  let html(status: Integer, markup: String) -> Connection = this.answered(status, markup, "text/html; charset=utf-8")
+
+  let plain(words: String) -> Connection = this.answered(200, words, "text/plain; charset=utf-8")
+  let plain(status: Integer, words: String) -> Connection = this.answered(status, words, "text/plain; charset=utf-8")
+
+  # Anything `JSON.stringify` takes.
+  let json(value: Any) -> Connection = this.answered(200, JSON.stringify(value), "application/json")
+  let json(status: Integer, value: Any) -> Connection = this.answered(status, JSON.stringify(value), "application/json")
+
+  # Sends the browser elsewhere: 303, which a form's POST should answer with.
+  let redirect(location: String) -> Connection = this.redirect(303, location)
+  let redirect(status: Integer, location: String) -> Connection = Connection { ...this.withHeader("Location", location), code: status, payload: Binary.empty, sent?: true }
+
+  # A response with no body.
+  let withoutBody(status: Integer) -> Connection = Connection { ...this, code: status, payload: Binary.empty, sent?: true }
+
+  # Bytes, of a type: a file.
+  let bytes(status: Integer, content: Binary, contentType: String) -> Connection = Connection { ...this.typed(contentType), code: status, payload: content, sent?: true }
+
+  let answered(status: Integer, content: String, contentType: String) -> Connection = Connection {
+    ...this.typed(contentType), code: status, payload: content.to(Binary).or(Binary.empty), sent?: true
+  }
+
+  # The content type, unless one was set by hand.
+  let typed(contentType: String) -> Connection do
+    match @outgoing.get("Content-Type") do
+      Just(_) => this
+      None => this.withHeader("Content-Type", contentType)
+    end
+  end
+end
+
+# A request made by hand, for specs: `Metro.Connection.asked("GET", "/channels")`,
+# to be given to `router.call`.
+asked : String -> String -> Connection
+let asked(verb, target) = asked(verb, target, [], "")
+
+asked : String -> String -> [(String, String)] -> String -> Connection
+let asked(verb, target, headers, body) = Connection {
+  request: Request {
+    method: verb, target: URI.parse(target).or(URI.parse("/").try),
+    headers: Headers.from(headers).or(Headers.empty), body: body.to(Binary).or(Binary.empty)
+  }
+}
+
+private do
+  decoded : String -> [(String, String?)]
+  let decoded(text) = URI.Form.parse(text).map { |form| form.entries }.or([])
+
+  named : [(String, String?)] -> String -> String?
+  let named(fields, name) do
+    match fields.find { |entry| match entry do (key, _) => key == name end } do
+      Just((_, value)) => value
+      None => None
+    end
+  end
+end

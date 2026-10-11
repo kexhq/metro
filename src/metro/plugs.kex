@@ -1,26 +1,27 @@
 # Plugs every application wants.
+#
+# A plug is a value — `let name = do |connection| … end` — and one that takes
+# something to work with is a function giving such a value back.
 module Metro.Plugs
 
-using Rodolfo
+using Metro.Connection, only: [Connection, Plug, plug]
 
 # Refuses a request that changes something and whose `Origin` is another
-# site: a form on someone else's page cannot post here. Put it on the whole
-# router — `plug(Metro.Plugs.sameOrigin)`.
-#
-# `ws` routes are outside Rodolfo's plug stack; ask `trusted?` from the
-# handler and close the socket on `false`.
-let sameOrigin = Plug.around do |inner, env|
-  if env.request.method == "GET" || env.request.method == "HEAD" || trusted?(env)
-    inner(env)
-  else
-    Response.Text { status: 403, body: "This request did not come from this site." }
-  end
+# site: a form on someone else's page cannot post here, and a script there
+# cannot open a socket here. For every pipeline a browser comes through.
+let sameOrigin = plug do |connection|
+  connection.verb == "HEAD" || (connection.verb == "GET" && connection.header("Upgrade").none?) || trusted?(connection) then connection else connection.plain(403, "This request did not come from this site.")
 end
 
 # Whether a request came from one of this site's own pages.
-trusted? : Context -> Bool
-let trusted?(env) = Metro.Cookies.sameOrigin?(env.request.headers.get("Origin"), env.request.headers.get("Host"))
+trusted? : Connection -> Bool
+let trusted?(connection) = Metro.Cookies.sameOrigin?(connection.header("Origin"), connection.header("Host"))
 
-# One cookie of a request.
-cookie : Context -> String -> String?
-let cookie(env, name) = Metro.Cookies.read(env.request.headers.get("Cookie"), name)
+# Notes something on every request, for the actions: the database, the hub.
+#
+#   pipeline(:app, [Metro.Plugs.providing(:database, database)])
+providing : Atom -> Any -> Plug
+let providing(key, value) = plug do |connection| connection.assign(key, value) end
+
+# Tells the browser not to keep the page: it is one person's.
+let unstored = plug do |connection| connection.withHeader("Cache-Control", "no-store") end

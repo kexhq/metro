@@ -1,0 +1,73 @@
+# An address an application has, said once: written from its parts where a
+# link is made, and read back into them where a request arrives.
+#
+#   let channel = Metro.Path.define("/:organization/channels/:name")
+#
+#   channel.filled({"organization": "acme", "name": "general"})   # => "/acme/channels/general"
+#   channel.captured("/acme/channels/general?thread=m1")          # => Just({"organization": "acme", "name": "general"})
+#   channel.captured("/acme/dm/u7")                               # => None
+#   Metro.Path.query("/acme/channels/general?thread=m1", "thread") # => Just("m1")
+#
+# The same text is what a route is declared with — `get(channel.template, …)`
+# — so the router, the links and whatever reads an address by hand cannot
+# come to disagree about it.
+module Metro.Path
+
+record Path do
+  # ":name" is one segment, kept under that name; "*name" is all that is left.
+  template : String
+end
+
+define : String -> Path
+let define(template) = Path { template: template }
+
+# One field of an address's query string. `+` is a space, as a form sends it.
+query : String -> String -> String?
+let query(address, name) do
+  let fields = URI.Form.parse(address.split("?").drop(1).join("?")).map { |form| form.entries }.or([])
+  match fields.find { |entry| match entry do (key, _) => key == name end } do
+    Just((_, value)) => value
+    None => None
+  end
+end
+
+# An address with a query string of the fields that have something in them.
+asking : String -> [(String, String)] -> String
+let asking(address, fields) do
+  let said = fields.reject { |entry| match entry do (_, value) => value.empty? end }
+  return address if said.empty?
+
+  let written = said.map { |entry| match entry do (key, value) => "${key}=${value}" end }.join("&")
+  "${address}?${written}"
+end
+
+make Path do
+  # The address for these parts. A part that is not given is left empty.
+  let filled(parts: {String: String}) -> String do
+    let written = segments(@template).map { |segment|
+      segment.startsWith?(":") || segment.startsWith?("*") then parts.get(segment.drop(1)).or("") else segment
+    }
+    "/${written.join("/")}"
+  end
+
+  # The parts of an address this path fits, or `None` when it does not. A
+  # query string is not part of the path, and is not looked at.
+  let captured(address: String) -> {String: String}? = fitted(segments(@template), segments(address.split("?").first.or("")), {})
+end
+
+private do
+  segments : String -> [String]
+  let segments(path) = path.split("/").reject { |segment| segment.empty? }
+
+  fitted : [String] -> [String] -> {String: String} -> {String: String}?
+  let fitted([], [], found) = Just(found)
+  let fitted([], given, found) = None
+  let fitted([wanted | rest], given, found) do
+    return Just(found.put(wanted.drop(1), given.join("/"))) if wanted.startsWith?("*")
+    return None if given.empty?
+
+    let present = given.first.or("")
+    return fitted(rest, given.drop(1), found.put(wanted.drop(1), present)) if wanted.startsWith?(":")
+    wanted == present then fitted(rest, given.drop(1), found) else None
+  end
+end
