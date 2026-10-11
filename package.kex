@@ -1,5 +1,6 @@
 package "metro" do
   version("0.1.0")
+  license("LGPL-3.0-or-later")
   description("A Rails- and Phoenix-like web framework for Kex")
   kex(">= 0.4.0-rc.1")
 

@@ -297,3 +297,9 @@ and CSRF as one construct, generators beyond `app`. See the plan in Kex's
 tey install
 tey test
 ```
+
+## License
+
+Metro is licensed under the GNU Lesser General Public License, version 3
+or (at your option) any later version (`LGPL-3.0-or-later`).
+See [COPYING.LESSER](COPYING.LESSER) and [COPYING](COPYING) for the license terms.
