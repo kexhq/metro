@@ -3,11 +3,11 @@ package "__app__" do
   description("__App__")
   kex(">= 0.4.0-rc.1")
 
-  # The entrypoint sits at the root so that app/, config/, db/ and lib/ are
-  # module roots (App.*, Config.*, DB.*, Lib.*). `src` is a symlink to this
-  # directory, made by script/setup.sh: Tey looks for modules in src/ and
-  # nowhere else, and without it `tey test` cannot find them.
+  # The application is laid out from its top: the entrypoint, and beside it
+  # the folders its modules are in — App.* in app/, Config.* in config/,
+  # DB.* in db/. A folder added later (lib/, say) is added here too.
   entrypoint("main.kex")
+  sources(["app", "config", "db"])
 
   command("server", run: "tey run server", description: "Migrate, then serve on http://localhost:4000")
   command("migrate", run: "tey run migrate", description: "Run the migrations this database has not run")

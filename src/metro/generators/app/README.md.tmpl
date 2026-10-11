@@ -3,7 +3,7 @@
 A [Metro](https://github.com/akoskovacs/metro) application.
 
 ```sh
-sh script/setup.sh # once: the src link, dependencies, the ODBC port program
+sh script/setup.sh # once: dependencies, the ODBC port program
 tey server         # http://127.0.0.1:4000 — register, then you are in
 tey test
 ```
