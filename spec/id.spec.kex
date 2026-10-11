@@ -1,0 +1,23 @@
+describe("Metro.Clock") do
+  it("reads the standard library's clock, in three sizes") do
+    let launch = DateTime.parse("2026-07-30T14:03:00Z").try
+    with Time.Clock = Mock.Clock { at: launch } do
+      Assert.equal(Metro.Clock.seconds(), 1785420180)
+      Assert.equal(Metro.Clock.milliseconds(), 1785420180000)
+      Assert.equal(Metro.Clock.microseconds(), 1785420180000000)
+    end
+  end
+end
+
+describe("Metro.Id") do
+  it("makes ids that say their kind and when, and never the same one twice") do
+    let launch = DateTime.parse("2026-07-30T14:03:00Z").try
+    with Time.Clock = Mock.Clock { at: launch } do
+      let first = Metro.Id.generate(prefix: "u")
+      let second = Metro.Id.generate(prefix: "u")
+      Assert.truthy(first.startsWith?("u1785420180000000-"))
+      Assert.truthy(first != second)
+    end
+    Assert.truthy(Metro.Id.serial() != Metro.Id.serial())
+  end
+end

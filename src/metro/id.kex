@@ -1,0 +1,19 @@
+# Metro.Id — ids, for what is stored and for what only lives a while.
+#
+#   Metro.Id.generate(prefix: "u")   "u1791741238785550-6": a new row's id
+#   Metro.Id.serial()              6: a tab, a seat — unique while this node runs
+#
+# A generated id is its kind's prefix, the microsecond it was made in and a
+# serial number. The prefix says what an id is an id of wherever it turns
+# up; the time keeps ids of one kind in the order they were made; the serial
+# number tells apart two made in the same microsecond.
+module Metro.Id
+
+# A new id for something stored, starting with its kind's prefix.
+generate : String -> String
+foul generate(prefix: String) -> String = "${prefix}${Metro.Clock.microseconds()}-${serial()}"
+
+# A number no other call on this node is given, for as long as it runs. Not
+# for anything stored: a restart starts again.
+serial : Integer
+foul serial = BEAM.erlang.unique_integer([:positive])

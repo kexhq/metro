@@ -14,6 +14,8 @@
 #   Metro.Plugs          the same-origin plug
 #   Metro.Decimal        decimals as scaled integers
 #   Metro.Environment    METRO_ENV, PORT and HOST: where the process runs
+#   Metro.Clock          the time as seconds, milliseconds or microseconds
+#   Metro.Id             ids for rows, and serial numbers for tabs
 #
 # HTTP is Rodolfo's for now; it is used in `Metro.Plugs` and
 # `Metro.Live.Client` only.
@@ -28,4 +30,6 @@ module Metro do
   export Metro.Plugs
   export Metro.Decimal
   export Metro.Environment
+  export Metro.Clock
+  export Metro.Id
 end

@@ -1,0 +1,20 @@
+# Metro.Clock — what time it is, as a number.
+#
+#   Metro.Clock.seconds()        when a session expires
+#   Metro.Clock.milliseconds()   when a message was sent, when a note lapses
+#   Metro.Clock.microseconds()   fine enough to tell two rows apart
+#
+# Each is the time since the start of 1970. They read the standard library's
+# clock (`Time.Clock`), so a spec that replaces it moves these too:
+#
+#   with Time.Clock = Mock.Clock { at: launch } do … end
+module Metro.Clock
+
+seconds : Integer
+foul seconds = Time.floorDiv(DateTime.epochNanos(), 1000000000)
+
+milliseconds : Integer
+foul milliseconds = Time.floorDiv(DateTime.epochNanos(), 1000000)
+
+microseconds : Integer
+foul microseconds = Time.floorDiv(DateTime.epochNanos(), 1000)
