@@ -9,11 +9,11 @@
 # do no harm: the server refuses to start and names the two heads, and one
 # more migration joins them:
 #
-#   let change = Harmat.Migration.merge(:merge_a_and_b, [:a, :b])
+#   let change = Migration.merge(:merge_a_and_b, [:a, :b])
 #
 # Adding one: write db/migrate/NNNNN_<name>.kex, declaring
 # `module DB.Migrate.NNNNN<Name>` and
-# `let change = migration :<name>, follows: :<the current head> do … end`,
+# `let change = Migration.define :<name>, follows: :<the current head> do … end`,
 # add it to the end of the list below, and declare what it creates in
 # db/schema. The server refuses to start when db/schema and the migrations
 # disagree.
@@ -22,7 +22,7 @@
 #   tey rollback         # undo the newest; `tey rollback 3` undoes three
 module DB.Migrations
 
-using Harmat.Migration, only: [Migration]
+using Harmat.Migration, as: Migration
 
 all : [Migration]
 let all = [

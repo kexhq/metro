@@ -1,14 +1,17 @@
 # Signed-in browsers, by the digest of the token each one holds.
 module DB.Migrate.N0002CreateSessions
 
-using Harmat.Migration, only: [Migration, migration, createTable, addIndex, string, bigint]
+using Harmat.Migration, as: Migration
+using Harmat.Migration, only: [createTable, addIndex]
 
-let change = migration :create_sessions, follows: :create_users do
-  createTable :sessions do
-    string(:token_digest).primaryKey
-    string(:user_id)
-    bigint(:expires_at)
-    string(:created_at)
+let change = Migration.define :create_sessions, follows: :create_users do
+  createTable(:sessions) do |t|
+    [
+      t.text(:token_digest, primaryKey: true),
+      t.text(:user_id),
+      t.bigint(:expires_at),
+      t.text(:created_at)
+    ]
   end
   addIndex(:sessions, [:user_id])
 end

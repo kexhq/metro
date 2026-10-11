@@ -2,19 +2,21 @@
 # password.
 module DB.Schema.Users
 
-using Harmat.Migration, only: [string]
-using Harmat.Table, only: [Definition, define]
+using Harmat.Table, as: Table
+using Harmat.Table, only: [Definition]
 
-let definition = define :users do
-  string(:id).primaryKey
-  string(:email)
-  string(:password_hash)
-  string(:created_at)
+let definition = Table.define :users do |t|
+  [
+    t.text(:id, primaryKey: true),
+    t.text(:email),
+    t.text(:password_hash),
+    t.text(:created_at)
+  ]
 end
 
 let table = DB.Schema.Users.definition.table
 
-let id = DB.Schema.Users.definition.text(:id)
-let email = DB.Schema.Users.definition.text(:email)
-let passwordHash = DB.Schema.Users.definition.text(:password_hash)
-let createdAt = DB.Schema.Users.definition.text(:created_at)
+let id = DB.Schema.Users.definition.textColumn(:id)
+let email = DB.Schema.Users.definition.textColumn(:email)
+let passwordHash = DB.Schema.Users.definition.textColumn(:password_hash)
+let createdAt = DB.Schema.Users.definition.textColumn(:created_at)
