@@ -1,30 +1,30 @@
 # Which database this process talks to: an ODBC connection string, chosen by
-# the environment. Harmat is the same for every database, so this file is the
-# whole difference between development and production.
+# the environment (`Metro.Environment`). Harmat is the same for every
+# database, so this file is the whole difference between development and
+# production.
 #
-#   __APP___ENV=development   SQLite file db/development.sqlite3   (the default)
-#   __APP___ENV=test          SQLite file db/test.sqlite3
-#   __APP___ENV=production    DATABASE_DSN is required, e.g. PostgreSQL:
+#   METRO_ENV=development   SQLite file db/development.sqlite3   (the default)
+#   METRO_ENV=test          SQLite file db/test.sqlite3
+#   METRO_ENV=production    DATABASE_DSN is required, e.g. PostgreSQL:
 #     DATABASE_DSN="Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=__app__;Uid=__app__;Pwd=secret"
 #
 # DATABASE_DSN, when set, wins in every environment. SQLITE_DRIVER names the
 # SQLite ODBC driver when it is not where Homebrew puts it.
 module Config.Database
 
-let SQLITE_DRIVER = "/opt/homebrew/lib/libsqlite3odbc.dylib"
+using Metro.Environment, only: [Development, Test, Production]
 
-environment : String
-foul environment = ENV.get("__APP___ENV").or("development")
+let SQLITE_DRIVER = "/opt/homebrew/lib/libsqlite3odbc.dylib"
 
 # The connection string, or why there is none.
 dsn : Result<String, String>
 foul dsn do
-  match (ENV.get("DATABASE_DSN"), environment()) do
+  match (ENV.get("DATABASE_DSN"), Metro.Environment.current()) do
     (Just(configured), _) => Ok(configured)
-    (None, "production") => Error("production needs DATABASE_DSN, an ODBC connection string such as Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=__app__;Uid=__app__;Pwd=secret")
-    (None, "development") => Ok(sqlite("db/development.sqlite3"))
-    (None, "test") => Ok(sqlite("db/test.sqlite3"))
-    (None, other) => Error("__APP___ENV must be development, test or production, not ${other}")
+    (None, Error(reason)) => Error(reason)
+    (None, Ok(Production)) => Error("production needs DATABASE_DSN, an ODBC connection string such as Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=__app__;Uid=__app__;Pwd=secret")
+    (None, Ok(Development)) => Ok(sqlite("db/development.sqlite3"))
+    (None, Ok(Test)) => Ok(sqlite("db/test.sqlite3"))
   end
 end
 

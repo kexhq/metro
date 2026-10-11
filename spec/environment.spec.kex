@@ -1,0 +1,33 @@
+using Metro.Environment, only: [Development, Test, Production]
+
+describe("Metro.Environment") do
+  it("is development unless METRO_ENV says otherwise") do
+    with ENV = Mock.Env { vars: {} } do
+      Assert.equal(Metro.Environment.current(), Ok(Development))
+    end
+    with ENV = Mock.Env { vars: {"METRO_ENV": "test"} } do
+      Assert.equal(Metro.Environment.current(), Ok(Test))
+    end
+    with ENV = Mock.Env { vars: {"METRO_ENV": "production"} } do
+      Assert.equal(Metro.Environment.current(), Ok(Production))
+      Assert.equal(Metro.Environment.current().map { |environment| environment.label }, Ok("production"))
+    end
+  end
+
+  it("refuses a name that is none of the three") do
+    with ENV = Mock.Env { vars: {"METRO_ENV": "prod"} } do
+      Assert.equal(Metro.Environment.current(), Error("METRO_ENV must be development, test or production, not prod"))
+    end
+  end
+
+  it("reads where to listen, with defaults") do
+    with ENV = Mock.Env { vars: {} } do
+      Assert.equal(Metro.Environment.port(), 4000)
+      Assert.equal(Metro.Environment.host(), "127.0.0.1")
+    end
+    with ENV = Mock.Env { vars: {"PORT": "8080", "HOST": "0.0.0.0"} } do
+      Assert.equal(Metro.Environment.port(), 8080)
+      Assert.equal(Metro.Environment.host(), "0.0.0.0")
+    end
+  end
+end

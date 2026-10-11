@@ -70,7 +70,7 @@ tey init chat --app
 tey add harmat --git https://github.com/kexhq/harmat --branch database-migrations-repositories
 tey add metro --git https://github.com/akoskovacs/metro --branch main   # asks to approve the plugin
 tey generate metro:app --force     # --force: it replaces what `tey init` wrote
-sh script/setup.sh                 # src link, dependencies, the ODBC port program
+sh script/setup.sh                 # dependencies, the ODBC port program
 tey server                         # http://127.0.0.1:4000
 ```
 

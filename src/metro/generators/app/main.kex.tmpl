@@ -4,8 +4,9 @@
 #   tey migrate     run the migrations this database has not run
 #   tey rollback    undo the newest migration; `tey rollback 3` undoes three
 #
-# PORT and HOST move the listener; __APP___ENV and DATABASE_DSN choose the
-# database (config/database.kex).
+# METRO_ENV says where this is running, and PORT and HOST move the listener
+# (`Metro.Environment`); the environment and DATABASE_DSN choose the database
+# (config/database.kex).
 
 # Project modules are named in full here rather than brought in with `using`:
 # with `src` linked to this directory, a `using` in the entrypoint finds each
@@ -39,10 +40,11 @@ foul undone(store: Server<DB.Store.Store>, count: Integer) -> Void do
 end
 
 foul served(store: Server<DB.Store.Store>) -> Void do
-  let port = ENV.get("PORT").flatMap { |text| text.to(Integer) }.or(4000)
-  let bindHost = ENV.get("HOST").or("127.0.0.1")
+  let port = Metro.Environment.port()
+  let bindHost = Metro.Environment.host()
+  let environment = Metro.Environment.current().map { |running| running.label }.or("")
   let site = Config.Routes.routes(store, Process.spawn(Metro.Live.Hub.Hub {}))
-  IO.printLine("__App__ (${Config.Database.environment()}) is on http://${bindHost == "0.0.0.0" then "localhost" else bindHost}:${port}")
+  IO.printLine("__App__ (${environment}) is on http://${bindHost == "0.0.0.0" then "localhost" else bindHost}:${port}")
   site.start(bindHost, port).try
 end
 
@@ -56,9 +58,10 @@ foul commanded(store: Server<DB.Store.Store>, args: [String]) -> Void do
 end
 
 main(args) do
-  match Config.Database.dsn do
-    Error(reason) => failed(reason)
-    Ok(dsn) => match DB.Store.started(dsn) do
+  match (Metro.Environment.current(), Config.Database.dsn) do
+    (Error(reason), _) => failed(reason)
+    (_, Error(reason)) => failed(reason)
+    (_, Ok(dsn)) => match DB.Store.started(dsn) do
       Error(reason) => failed(reason)
       Ok(store) => commanded(store, args)
     end

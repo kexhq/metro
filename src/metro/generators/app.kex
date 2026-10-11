@@ -1,8 +1,9 @@
 # The `app` generator: the files of a new Metro application.
 #
 # A new app is the skeleton every Metro application shares — the Rails-style
-# layout, the database store and migrations, registration and sign-in, and one
-# live page to start from — with the application's name filled in. The
+# layout, the database store and migrations, registration and sign-in, one
+# live page to start from, and a Dockerfile and docker-compose.yml that run
+# it on PostgreSQL — with the application's name filled in. The
 # templates are the files under app/ beside this module; they are embedded
 # when Metro is built, so generating needs nothing on disk but Metro itself.
 #
@@ -20,8 +21,8 @@ record Sources do
 end
 
 # Whether a name can be an application's: lower-case letters, digits and
-# underscores, starting with a letter — it becomes a package name, a cookie
-# name and an environment variable.
+# underscores, starting with a letter — it becomes a package name and a
+# cookie name.
 valid? : String -> Bool
 let valid?(name) do
   let allowed = name.chars.all? { |char| char.lower? || char.digit? || "${char}" == "_" }
@@ -48,7 +49,9 @@ private do
 
   templates : [(String, String)]
   let templates = [
+  (".dockerignore", Kex.embed("app/.dockerignore.tmpl")),
   (".gitignore", Kex.embed("app/.gitignore.tmpl")),
+  ("Dockerfile", Kex.embed("app/Dockerfile.tmpl")),
   ("README.md", Kex.embed("app/README.md.tmpl")),
   ("app/controllers/accounts.kex", Kex.embed("app/app/controllers/accounts.kex.tmpl")),
   ("app/controllers/application.kex", Kex.embed("app/app/controllers/application.kex.tmpl")),
@@ -67,6 +70,7 @@ private do
   ("app/views/layouts/auth.html.ket", Kex.embed("app/app/views/layouts/auth.html.ket.tmpl")),
   ("config/database.kex", Kex.embed("app/config/database.kex.tmpl")),
   ("config/routes.kex", Kex.embed("app/config/routes.kex.tmpl")),
+  ("docker-compose.yml", Kex.embed("app/docker-compose.yml.tmpl")),
   ("db/migrate/N0001_create_users.kex", Kex.embed("app/db/migrate/N0001_create_users.kex.tmpl")),
   ("db/migrate/N0002_create_sessions.kex", Kex.embed("app/db/migrate/N0002_create_sessions.kex.tmpl")),
   ("db/migrations.kex", Kex.embed("app/db/migrations.kex.tmpl")),

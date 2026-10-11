@@ -47,8 +47,8 @@ main do
     match file do (path, content) => { kind: "write", path: path, content: content } end
   }
   # `tey init` leaves a src/main.kex behind; a Metro app's entrypoint is at
-  # the root and `src` becomes a link to it (script/setup.sh), so the file
-  # has to go for the directory to be replaceable.
+  # the root and its modules are in the folders package.kex names, so the
+  # file goes, and script/setup.sh removes the directory it leaves empty.
   let operations = writes + [{ kind: "delete", path: "src/main.kex", content: "" }]
   IO.printLine(JSON.stringify({ version: 1, operations: operations }))
 end
