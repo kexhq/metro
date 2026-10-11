@@ -1,0 +1,57 @@
+# What people are in the middle of, for a while: "is typing", "Deploying".
+#
+# A note belongs to a member of a topic — a person in a conversation — and
+# lapses by itself. Nothing here is stored: it lives in a `serving` process,
+# and a restart forgets it, which is what a note that says "right now" should
+# do.
+#
+#   let board = Process.spawn(Metro.Live.Presence.Presence {})
+#   board.noted("general", user.id, "is typing", now + 6000)
+#   Metro.Live.Presence.standing(board, "general", now)   # => [Note]
+#
+# Times are milliseconds since 1970, and the caller's: the board has no clock.
+module Metro.Live.Presence
+
+record Note do
+  topic : String
+  member : String
+  # What they are doing, in words; "" when the topic's own default says it.
+  saying : String
+  # When it stops being true.
+  lapses : Integer
+end
+
+record Presence do
+  notes : [Note] = []
+end
+
+serving Presence do
+  # Says what a member of a topic is doing until `lapses`, in place of
+  # whatever was said for them before.
+  slot noted(topic: String, member: String, text: String, lapses: Integer) -> Void do
+    new.notes = @notes.reject { |note| note.topic == topic && note.member == member } + [Note { topic: topic, member: member, saying: text, lapses: lapses }]
+    return new
+  end
+
+  # Takes a member's note back before it lapses.
+  slot lifted(topic: String, member: String) -> Void do
+    new.notes = @notes.reject { |note| note.topic == topic && note.member == member }
+    return new
+  end
+
+  # The notes of a topic that still stand at `now`. Lapsed ones, of every
+  # topic, are forgotten on the way.
+  slot current(topic: String, now: Integer) -> Reply<[Note]> do
+    new.notes = @notes.filter { |note| note.lapses > now }
+    return { new, reply: new.notes.filter { |note| note.topic == topic } }
+  end
+end
+
+# The notes of a topic that still stand; none when the board does not answer.
+standing : Server<Presence> -> String -> Integer -> [Note]
+foul standing(board, topic, now) do
+  match board.current(topic, now) do
+    Ok(notes) => return notes
+    Error(_) => return []
+  end
+end

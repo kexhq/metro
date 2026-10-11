@@ -90,6 +90,11 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   the selection in a field.
 - `data-live-enter` on a textarea of a live form makes Enter send the form and
   Shift+Enter start a new line.
+- `data-live-typing` on a live form sends a `typing` event, at most every few
+  seconds, while somebody types in it; `data-live-until="<ms since 1970>"`
+  takes an element off the page when its time is up. `Metro.Live.Presence`
+  is the process that remembers such notes ("is typing", "Deploying") until
+  they lapse.
 
 `Metro.Live.Hub` groups connections — by user, by channel, by whatever shares
 data. When a step reports that shared data changed, the rest of the group is

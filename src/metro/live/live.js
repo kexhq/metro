@@ -181,15 +181,36 @@
     // box. The server's reply cannot clear it, because what the person is
     // typing into is left alone when the page is patched.
     if (form.hasAttribute("data-live-reset")) form.reset();
+    typed = 0;
   });
 
+  // `data-live-typing` on a live form: while somebody types in it the server
+  // is sent a `typing` event, at most one every few seconds, so it can tell
+  // the others. What is typed is not sent.
+  const TYPING_EVERY = 3000;
+  let typed = 0;
+
   app.addEventListener("input", (input) => {
+    const told = input.target.closest("form[data-live-typing]");
+    if (told && input.target.value && Date.now() - typed > TYPING_EVERY) {
+      typed = Date.now();
+      send({ event: "typing" });
+    }
     const form = input.target.closest("form[data-live]");
     // `data-live-quiet`: a form the server only hears from when it is sent.
     if (!form || form.hasAttribute("data-live-quiet")) return;
     clearTimeout(typing);
     typing = setTimeout(() => sendForm(form, "change"), TYPING_PAUSE);
   });
+
+  // `data-live-until="<milliseconds since 1970>"`: something true for a
+  // while — "Ada is typing". It leaves the page when its time is up, whether
+  // or not the server says anything more.
+  setInterval(() => {
+    for (const passing of app.querySelectorAll("[data-live-until]")) {
+      if (Number(passing.dataset.liveUntil) <= Date.now()) passing.remove();
+    }
+  }, 500);
 
   // --- Patching -----------------------------------------------------------
 
