@@ -1,0 +1,20 @@
+---
+params: [app: String, title: String]
+---
+# The home page's markup: a layout, and the live region inside it. The
+# templates are the `.ket` files beside this one; `<%%= %>` escapes what it
+# prints.
+module App.Views.Home
+
+using App.Live.Tab, only: [Tab]
+
+let layout = Template.html(Kex.embed("layouts/application.html.ket"))
+let home = Template.html(Kex.embed("home/index.html.ket"))
+
+# The document: head, who is signed in, the live region, and Metro's script.
+page : String -> String -> String
+let page(email, live) = layout(email, live)
+
+# The live region.
+index : String -> Tab -> String
+let index(email, tab) = home(email, "${tab.presses}", tab.notice)

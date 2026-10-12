@@ -1,0 +1,20 @@
+---
+params: [app: String, title: String]
+---
+# People who can sign in. One account per email address.
+module DB.Migrate.N0001CreateUsers
+
+using Harmat.Migration, as: Migration
+using Harmat.Migration, only: [createTable, addIndex]
+
+let change = Migration.define :create_users do
+  createTable(:users) do |t|
+    [
+      t.text(:id, primaryKey: true),
+      t.text(:email),
+      t.text(:password_hash),
+      t.text(:created_at)
+    ]
+  end
+  addIndex(:users, [:email], unique: true)
+end

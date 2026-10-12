@@ -1,0 +1,10 @@
+---
+params: [app: String, title: String]
+---
+# Someone who can sign in.
+module App.Models.User
+
+record User do
+  id : String
+  email : String
+end

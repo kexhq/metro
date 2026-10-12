@@ -1,0 +1,20 @@
+---
+params: [app: String, title: String]
+---
+---
+params: [email: String, problems: [String], shortest: String]
+---
+<%% if !problems.empty? %>
+<ul class="failure" role="alert"><%% problems.map do |problem| %><li><%%= problem %></li><%% end %></ul>
+<%% end %>
+<form method="post" action="/register" class="credentials">
+  <label class="field"><span class="label">Email</span>
+    <input type="email" name="email" value="<%%= email %>" autocomplete="username" required autofocus>
+  </label>
+  <label class="field"><span class="label">Password</span>
+    <input type="password" name="password" autocomplete="new-password" minlength="<%%= shortest %>" required>
+    <span class="hint">At least <%%= shortest %> characters. A long phrase is fine.</span>
+  </label>
+  <button type="submit" class="primary">Create account</button>
+</form>
+<p class="switch">Already registered? <a href="/signin">Sign in</a></p>

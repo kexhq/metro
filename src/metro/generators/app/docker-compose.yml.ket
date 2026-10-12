@@ -1,0 +1,56 @@
+---
+params: [app: String, title: String]
+---
+# <%= title %> and the PostgreSQL it keeps its data in.
+#
+#   docker compose up --build              http://localhost:4000
+#   docker compose run --rm app migrate    run the migrations, and stop
+#   docker compose down                    stop; the data stays in its volume
+#   docker compose down --volumes          stop, and forget the data
+#
+# Set in the environment, or in a .env file beside this one:
+#
+#   POSTGRES_PASSWORD   replaces the password below — do that anywhere but
+#                       your own machine
+#   KEX_IMAGE           the Kex toolchain image the application is built on
+#   GITHUB_TOKEN        fetches dependencies that are in private repositories,
+#                       e.g. GITHUB_TOKEN=$(gh auth token) docker compose build
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: <%= app %>
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-<%= app %>}
+      POSTGRES_DB: <%= app %>
+    volumes:
+      - data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U <%= app %> -d <%= app %>"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      args:
+        KEX_IMAGE: ${KEX_IMAGE:-ghcr.io/kexhq/kex:rc}
+      secrets:
+        - github_token
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      METRO_ENV: ${METRO_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 4000
+      DATABASE_DSN: "Driver={PostgreSQL Unicode};Server=db;Port=5432;Database=<%= app %>;Uid=<%= app %>;Pwd=${POSTGRES_PASSWORD:-<%= app %>}"
+    ports:
+      - "${PORT:-4000}:4000"
+
+volumes:
+  data:
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN

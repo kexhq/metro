@@ -1,0 +1,101 @@
+---
+params: [app: String, title: String]
+---
+# Registration, sign-in and sign-out: everything about who someone is, short
+# of HTTP. The routes turn what these return into cookies and redirects.
+#
+# A session is a random token in the browser and its digest in the database
+# (`Metro.Auth.Token`), good for `LIFETIME` seconds. Passwords are stored as
+# `Metro.Auth.Password` lines, hashed in the calling process: a hash takes long
+# enough that doing it in the database's would hold up everyone else.
+module App.Services.Authentication
+
+using DB.Repositories.Sessions, only: [SessionRepository]
+using DB.Repositories.Users, only: [UserRepository]
+using App.Models.User, only: [User]
+using Harmat.Db, only: [Db]
+
+# How long a sign-in lasts: thirty days.
+let LIFETIME = 2592000
+
+# What is said for every failed sign-in, whichever half was wrong.
+let REFUSED = "That email and password do not match an account."
+
+# Creates an account and signs it in. The session token, or what was wrong.
+register : Db -> String -> String -> Result<String, [String]>
+foul register(database, email, password) do
+  let problems = App.Forms.Credentials.problems(email, password)
+  return Error(problems) if !problems.empty?
+
+  let address = App.Forms.Credentials.normalized(email)
+  match UserRepository { db: database }.credentials(address) do
+    Error(reason) => Error([reason])
+    Ok(Just(_)) => Error(["An account with that email already exists. Sign in instead."])
+    Ok(None) => enrolled(database, User { id: "u${BEAM.erlang.system_time(:microsecond)}-${BEAM.erlang.unique_integer([:positive])}", email: address }, password)
+  end
+end
+
+# Signs in. The session token, or `REFUSED` — the same words and about the
+# same time whether the email is unknown or the password wrong.
+signIn : Db -> String -> String -> Result<String, [String]>
+foul signIn(database, email, password) do
+  match UserRepository { db: database }.credentials(App.Forms.Credentials.normalized(email)) do
+    Error(reason) => Error([reason])
+    Ok(None) => do
+      Metro.Auth.Password.wasted(password)
+      return Error([REFUSED])
+    end
+    Ok(Just((user, stored))) => Metro.Auth.Password.matches?(password, stored) then admitted(database, user.id) else Error([REFUSED])
+  end
+end
+
+# Who a session token belongs to, if it is a live session. An expired one is
+# deleted on sight.
+current : Db -> String? -> User?
+foul current(database, None) = None
+foul current(database, Just(token)) do
+  let digest = Metro.Auth.Token.digest(token)
+  match SessionRepository { db: database }.holder(digest) do
+    Ok(Just((userId, expiresAt))) => do
+      if expiresAt <= now()
+        SessionRepository { db: database }.revoke(digest)
+        return None
+      end
+      match UserRepository { db: database }.member(userId) do
+        Ok(found) => found
+        Error(_) => None
+      end
+    end
+    _ => None
+  end
+end
+
+# Ends a session. The token stops working at once, wherever else it was copied.
+signOut : Db -> String? -> Void
+foul signOut(database, None) = ()
+foul signOut(database, Just(token)) do
+  SessionRepository { db: database }.revoke(Metro.Auth.Token.digest(token))
+  return ()
+end
+
+private do
+  # Stores the account and signs it in.
+  foul enrolled(database: Db, user: User, password: String) -> Result<String, [String]> do
+    match UserRepository { db: database }.enroll(user, Metro.Auth.Password.hashed(password)) do
+      Error(_) => Error(["An account with that email already exists. Sign in instead."])
+      Ok(_) => admitted(database, user.id)
+    end
+  end
+
+  foul now() -> Integer do
+    return BEAM.erlang.system_time(:second)
+  end
+
+  foul admitted(database: Db, userId: String) -> Result<String, [String]> do
+    let token = Metro.Auth.Token.fresh()
+    match SessionRepository { db: database }.admit(Metro.Auth.Token.digest(token), userId, now() + LIFETIME) do
+      Ok(_) => Ok(token)
+      Error(reason) => Error([reason])
+    end
+  end
+end

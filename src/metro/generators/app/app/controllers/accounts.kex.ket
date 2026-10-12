@@ -1,0 +1,48 @@
+---
+params: [app: String, title: String]
+---
+# Signing in, signing out and registering.
+module App.Controllers.Accounts
+
+using Metro.WebRequest, only: [WebRequest]
+using App.Controllers.Application, only: [databaseFor, page, COOKIE]
+
+signInPage : WebRequest -> WebRequest
+foul signInPage(request) = page(request, 200, App.Views.Auth.signin("", []))
+
+signIn : WebRequest -> WebRequest
+foul signIn(request) do
+  let email = request.param("email").or("")
+  match App.Services.Authentication.signIn(databaseFor(request), email, request.param("password").or("")) do
+    Ok(token) => return entered(request, token)
+    Error(problems) => return page(request, 422, App.Views.Auth.signin(email, problems))
+  end
+end
+
+signOut : WebRequest -> WebRequest
+foul signOut(request) do
+  App.Services.Authentication.signOut(databaseFor(request), request.cookie(COOKIE))
+  return request.withCookie(Metro.Cookies.cleared(COOKIE)).redirect("/signin")
+end
+
+registrationPage : WebRequest -> WebRequest
+foul registrationPage(request) = page(request, 200, App.Views.Auth.register("", []))
+
+register : WebRequest -> WebRequest
+foul register(request) do
+  let email = request.param("email").or("")
+  match App.Services.Authentication.register(databaseFor(request), email, request.param("password").or("")) do
+    Ok(token) => return entered(request, token)
+    Error(problems) => return page(request, 422, App.Views.Auth.register(email, problems))
+  end
+end
+
+private do
+  # Signed in: hand the browser its session and send it home. `Secure` goes
+  # on the cookie when the request arrived over HTTPS, as a proxy reports it.
+  entered : WebRequest -> String -> WebRequest
+  let entered(request, token) do
+    let secure? = request.header("X-Forwarded-Proto") == Just("https")
+    request.withCookie(Metro.Cookies.issued(COOKIE, token, App.Services.Authentication.LIFETIME, secure?)).redirect("/")
+  end
+end
