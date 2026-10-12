@@ -9,12 +9,10 @@ using Harmat.Migration, only: [createTable, addIndex]
 
 let change = Migration.define :create_users do
   createTable(:users) do |t|
-    [
-      t.text(:id, primaryKey: true),
-      t.text(:email),
-      t.text(:password_hash),
-      t.text(:created_at)
-    ]
+    t.text(:id, primaryKey: true)
+    t.text(:email)
+    t.text(:password_hash)
+    t.text(:created_at)
   end
   addIndex(:users, [:email], unique: true)
 end
