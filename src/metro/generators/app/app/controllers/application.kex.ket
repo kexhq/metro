@@ -1,0 +1,59 @@
+---
+params: [app: String, title: String]
+---
+# What every controller shares: who is asking, what the application runs on,
+# and the plugs that decide who gets as far as an action.
+#
+# The database and the hub are put on every request by the router's first
+# pipeline (config/routes.kex); these read them back, with their types.
+module App.Controllers.Application
+
+using Harmat.Db, only: [Db]
+using Metro.WebRequest, only: [WebRequest, Plug, plug]
+using Metro.Live.Hub, only: [Hub]
+using App.Models.User, only: [User]
+
+# The cookie a session's token travels in.
+let COOKIE = "<%= app %>_session"
+
+databaseFor : WebRequest -> Db
+foul databaseFor(request) do
+  let found : Db = request.assigned(:database).try
+  return found
+end
+
+hubFor : WebRequest -> Server<Hub>
+foul hubFor(request) do
+  let found : Server<Hub> = request.assigned(:hub).try
+  return found
+end
+
+# The person signed in, behind `signedIn`.
+userFor : WebRequest -> User
+foul userFor(request) do
+  let found : User = request.assigned(:user).try
+  return found
+end
+
+# A page of the application: its stylesheet and script addressed by what is
+# in them, so a changed file is always fetched again.
+page : WebRequest -> Integer -> String -> WebRequest
+foul page(request, status, markup) = request.html(status, Metro.Assets.marked(markup, "public", ["/app.css"]))
+
+# Who a request's session cookie says is asking.
+visitor : WebRequest -> User?
+foul visitor(request) = App.Services.Authentication.current(databaseFor(request), request.cookie(COOKIE))
+
+# Lets a signed-in request through, noting who it is; sends anyone else to
+# sign in.
+foul signedIn() -> Plug = plug do |request|
+  match visitor(request) do
+    Just(user) => request.assign(:user, user)
+    None => request.redirect("/signin")
+  end
+end
+
+# The reverse, for the sign-in and registration pages.
+foul signedOut() -> Plug = plug do |request|
+  visitor(request).set? then request.redirect("/") else request
+end

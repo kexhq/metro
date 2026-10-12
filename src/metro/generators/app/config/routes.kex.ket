@@ -1,0 +1,53 @@
+---
+params: [app: String, title: String]
+---
+# Every address the application answers, and who gets as far as answering.
+#
+#   :application   the database and the hub, on every request
+#   :browser       no request from another site; nothing kept by a cache
+#   :members       signed in, or sent to sign in
+#   :guests        signed out, or sent home
+#
+# Who is asking is a session token in the `<%= app %>_session` cookie. It is
+# looked up once, by a plug, and the actions are handed who it was.
+module Config.Routes
+
+using Metro.Live.Hub, only: [Hub]
+using Metro.Plugs, only: [providing]
+using Metro.Router, only: [pipeline, scope, get, post, live, static]
+using DB.Store, only: [Store]
+# Actions are named bare, and so imported by name: a reference through the
+# module (`~App.Controllers.Home.show`) does not resolve when it is called
+# (kexhq/kex#476).
+using App.Controllers.Accounts, only: [signInPage, signIn, signOut, registrationPage, register]
+using App.Controllers.Home, only: [show]
+
+routes : Server<Store> -> Server<Hub> -> Metro.Router.Router
+foul routes(store, hub) do
+  let database = Harmat.Db.over(DB.Store.gateway(store))
+  Metro.Router.define do
+    pipeline(:application, [providing(:database, database), providing(:hub, hub)])
+    pipeline(:browser, [Metro.Plugs.sameOrigin, Metro.Plugs.unstored])
+    pipeline(:members, [App.Controllers.Application.signedIn()])
+    pipeline(:guests, [App.Controllers.Application.signedOut()])
+
+    scope "/", via: [:application, :browser, :guests] do
+      get("/signin", ~signInPage)
+      post("/signin", ~signIn)
+      get("/register", ~registrationPage)
+      post("/register", ~register)
+    end
+
+    scope "/", via: [:application, :browser, :members] do
+      get("/", ~show)
+      post("/signout", ~signOut)
+      # The home page kept current: events in, markup out. Behind the same
+      # plugs as the page, so a socket from another site, or from nobody, is
+      # refused.
+      live "/live" do |request, socket| App.Controllers.Home.joined(request, socket) end
+    end
+
+    Metro.Live.Client.route()
+    static("public")
+  end
+end

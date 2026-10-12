@@ -3,9 +3,10 @@
 # A new app is the skeleton every Metro application shares — the Rails-style
 # layout, the database store and migrations, registration and sign-in, one
 # live page to start from, and a Dockerfile and docker-compose.yml that run
-# it on PostgreSQL — with the application's name filled in. The
-# templates are the files under app/ beside this module; they are embedded
-# when Metro is built, so generating needs nothing on disk but Metro itself.
+# it on PostgreSQL — with the application's name filled in. The templates
+# are the `.ket` files under app/ beside this module, each named after the
+# file it makes; they are embedded when Metro is built, so generating needs
+# nothing on disk but Metro itself.
 #
 # This module only says what to write. Writing is the caller's: Tey's plugin
 # host (generators/app.kex speaks its protocol) or, until Tey can run a
@@ -35,56 +36,57 @@ let titled(name) = name.split("_").map { |part| part.capitalize }.join("")
 
 # Every file of a new application named `name`, as (path, content).
 files : String -> Sources -> [(String, String)]
-let files(name, sources) = templates().map { |template|
-  match template do (path, text) => (path, filled(text, name, sources)) end
-}
+let files(name, sources) do
+  let title = titled(name)
+  let manifest = Template.text(Kex.embed("app/package.kex.ket"))
+  let written = templates().map { |template|
+    match template do (path, render) => (path, render(name, title)) end
+  }
+  written + [("package.kex", manifest(name, title, sources.harmat, sources.harmatBranch, sources.metro, sources.metroBranch))]
+end
 
 private do
-  filled : String -> String -> Sources -> String
-  let filled(text, name, sources) do
-    text.replace("__APP__", name.upperCase).replace("__App__", titled(name)).replace("__app__", name)
-      .replace("__HARMAT_BRANCH__", sources.harmatBranch).replace("__HARMAT__", sources.harmat)
-      .replace("__METRO_BRANCH__", sources.metroBranch).replace("__METRO__", sources.metro)
-  end
-
-  templates : [(String, String)]
+  # A file of a new application: where it goes, and the template it is
+  # written from — a `.ket` beside this module, handed the application's
+  # name as it is and as a title ("chat_room", "ChatRoom"). package.kex is
+  # not among them: it is told where the dependencies come from as well.
+  templates : [(String, String -> String -> String)]
   let templates = [
-  (".dockerignore", Kex.embed("app/.dockerignore.tmpl")),
-  (".gitignore", Kex.embed("app/.gitignore.tmpl")),
-  ("Dockerfile", Kex.embed("app/Dockerfile.tmpl")),
-  ("README.md", Kex.embed("app/README.md.tmpl")),
-  ("app/controllers/accounts.kex", Kex.embed("app/app/controllers/accounts.kex.tmpl")),
-  ("app/controllers/application.kex", Kex.embed("app/app/controllers/application.kex.tmpl")),
-  ("app/controllers/home.kex", Kex.embed("app/app/controllers/home.kex.tmpl")),
-  ("app/forms/credentials.kex", Kex.embed("app/app/forms/credentials.kex.tmpl")),
-  ("app/live/home.kex", Kex.embed("app/app/live/home.kex.tmpl")),
-  ("app/live/tab.kex", Kex.embed("app/app/live/tab.kex.tmpl")),
-  ("app/models/user.kex", Kex.embed("app/app/models/user.kex.tmpl")),
-  ("app/services/authentication.kex", Kex.embed("app/app/services/authentication.kex.tmpl")),
-  ("app/views/auth.kex", Kex.embed("app/app/views/auth.kex.tmpl")),
-  ("app/views/auth/register.html.ket", Kex.embed("app/app/views/auth/register.html.ket.tmpl")),
-  ("app/views/auth/signin.html.ket", Kex.embed("app/app/views/auth/signin.html.ket.tmpl")),
-  ("app/views/home.kex", Kex.embed("app/app/views/home.kex.tmpl")),
-  ("app/views/home/index.html.ket", Kex.embed("app/app/views/home/index.html.ket.tmpl")),
-  ("app/views/layouts/application.html.ket", Kex.embed("app/app/views/layouts/application.html.ket.tmpl")),
-  ("app/views/layouts/auth.html.ket", Kex.embed("app/app/views/layouts/auth.html.ket.tmpl")),
-  ("config/database.kex", Kex.embed("app/config/database.kex.tmpl")),
-  ("config/routes.kex", Kex.embed("app/config/routes.kex.tmpl")),
-  ("docker-compose.yml", Kex.embed("app/docker-compose.yml.tmpl")),
-  ("db/migrate/N0001_create_users.kex", Kex.embed("app/db/migrate/N0001_create_users.kex.tmpl")),
-  ("db/migrate/N0002_create_sessions.kex", Kex.embed("app/db/migrate/N0002_create_sessions.kex.tmpl")),
-  ("db/migrations.kex", Kex.embed("app/db/migrations.kex.tmpl")),
-  ("db/repositories/sessions.kex", Kex.embed("app/db/repositories/sessions.kex.tmpl")),
-  ("db/repositories/users.kex", Kex.embed("app/db/repositories/users.kex.tmpl")),
-  ("db/schema.kex", Kex.embed("app/db/schema.kex.tmpl")),
-  ("db/schema/sessions.kex", Kex.embed("app/db/schema/sessions.kex.tmpl")),
-  ("db/schema/users.kex", Kex.embed("app/db/schema/users.kex.tmpl")),
-  ("db/store.kex", Kex.embed("app/db/store.kex.tmpl")),
-  ("main.kex", Kex.embed("app/main.kex.tmpl")),
-  ("package.kex", Kex.embed("app/package.kex.tmpl")),
-  ("public/app.css", Kex.embed("app/public/app.css.tmpl")),
-  ("script/setup-odbc.sh", Kex.embed("app/script/setup-odbc.sh.tmpl")),
-  ("script/setup.sh", Kex.embed("app/script/setup.sh.tmpl")),
-  ("spec/app.spec.kex", Kex.embed("app/spec/app.spec.kex.tmpl"))
+    (".dockerignore", Template.text(Kex.embed("app/.dockerignore.ket"))),
+    (".gitignore", Template.text(Kex.embed("app/.gitignore.ket"))),
+    ("Dockerfile", Template.text(Kex.embed("app/Dockerfile.ket"))),
+    ("README.md", Template.text(Kex.embed("app/README.md.ket"))),
+    ("app/controllers/accounts.kex", Template.text(Kex.embed("app/app/controllers/accounts.kex.ket"))),
+    ("app/controllers/application.kex", Template.text(Kex.embed("app/app/controllers/application.kex.ket"))),
+    ("app/controllers/home.kex", Template.text(Kex.embed("app/app/controllers/home.kex.ket"))),
+    ("app/forms/credentials.kex", Template.text(Kex.embed("app/app/forms/credentials.kex.ket"))),
+    ("app/live/home.kex", Template.text(Kex.embed("app/app/live/home.kex.ket"))),
+    ("app/live/tab.kex", Template.text(Kex.embed("app/app/live/tab.kex.ket"))),
+    ("app/models/user.kex", Template.text(Kex.embed("app/app/models/user.kex.ket"))),
+    ("app/services/authentication.kex", Template.text(Kex.embed("app/app/services/authentication.kex.ket"))),
+    ("app/views/auth.kex", Template.text(Kex.embed("app/app/views/auth.kex.ket"))),
+    ("app/views/auth/register.html.ket", Template.text(Kex.embed("app/app/views/auth/register.html.ket.ket"))),
+    ("app/views/auth/signin.html.ket", Template.text(Kex.embed("app/app/views/auth/signin.html.ket.ket"))),
+    ("app/views/home.kex", Template.text(Kex.embed("app/app/views/home.kex.ket"))),
+    ("app/views/home/index.html.ket", Template.text(Kex.embed("app/app/views/home/index.html.ket.ket"))),
+    ("app/views/layouts/application.html.ket", Template.text(Kex.embed("app/app/views/layouts/application.html.ket.ket"))),
+    ("app/views/layouts/auth.html.ket", Template.text(Kex.embed("app/app/views/layouts/auth.html.ket.ket"))),
+    ("config/database.kex", Template.text(Kex.embed("app/config/database.kex.ket"))),
+    ("config/routes.kex", Template.text(Kex.embed("app/config/routes.kex.ket"))),
+    ("docker-compose.yml", Template.text(Kex.embed("app/docker-compose.yml.ket"))),
+    ("db/migrate/N0001_create_users.kex", Template.text(Kex.embed("app/db/migrate/N0001_create_users.kex.ket"))),
+    ("db/migrate/N0002_create_sessions.kex", Template.text(Kex.embed("app/db/migrate/N0002_create_sessions.kex.ket"))),
+    ("db/migrations.kex", Template.text(Kex.embed("app/db/migrations.kex.ket"))),
+    ("db/repositories/sessions.kex", Template.text(Kex.embed("app/db/repositories/sessions.kex.ket"))),
+    ("db/repositories/users.kex", Template.text(Kex.embed("app/db/repositories/users.kex.ket"))),
+    ("db/schema.kex", Template.text(Kex.embed("app/db/schema.kex.ket"))),
+    ("db/schema/sessions.kex", Template.text(Kex.embed("app/db/schema/sessions.kex.ket"))),
+    ("db/schema/users.kex", Template.text(Kex.embed("app/db/schema/users.kex.ket"))),
+    ("db/store.kex", Template.text(Kex.embed("app/db/store.kex.ket"))),
+    ("main.kex", Template.text(Kex.embed("app/main.kex.ket"))),
+    ("public/app.css", Template.text(Kex.embed("app/public/app.css.ket"))),
+    ("script/setup-odbc.sh", Template.text(Kex.embed("app/script/setup-odbc.sh.ket"))),
+    ("script/setup.sh", Template.text(Kex.embed("app/script/setup.sh.ket"))),
+    ("spec/app.spec.kex", Template.text(Kex.embed("app/spec/app.spec.kex.ket")))
   ]
 end

@@ -1,9 +1,0 @@
-# What one browser tab is in the middle of. Nothing here is stored: it lives
-# as long as the tab's WebSocket does.
-module App.Live.Tab
-
-record Tab do
-  # How many times the button has been pressed in this tab.
-  presses : Integer = 0
-  notice : String = ""
-end

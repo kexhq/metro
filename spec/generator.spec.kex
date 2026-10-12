@@ -24,6 +24,19 @@ describe("Metro.Generators.App") do
     Assert.truthy(compose.contains?("POSTGRES_DB: chat_room"))
     Assert.truthy(compose.contains?("Database=chat_room;Uid=chat_room;Pwd="))
     Assert.truthy(compose.contains?("POSTGRES_PASSWORD:-chat_room}"))
-    Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("__app__") || text.contains?("__App__") end })
+  end
+
+  it("fills the application's name in, and leaves a generated template's own tags alone") do
+    Assert.equal(files.count, 37)
+    Assert.truthy(written("package.kex").startsWith?("package \"chat_room\" do"))
+    Assert.truthy(written("package.kex").contains?("tey(\"harmat\", git: \"https://github.com/kexhq/harmat\""))
+    Assert.truthy(written("README.md").startsWith?("# ChatRoom"))
+    # A page of the application is a template itself: its front matter and
+    # its tags are the application's, not the generator's.
+    let page = written("app/views/home/index.html.ket")
+    Assert.truthy(page.startsWith?("---\nparams: ["))
+    Assert.truthy(page.contains?("<%= ") && !page.contains?("<%%"))
+    # Nothing of the generator's own is left in what it writes.
+    Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("<%= app %>") || text.contains?("<%= title %>") end })
   end
 end

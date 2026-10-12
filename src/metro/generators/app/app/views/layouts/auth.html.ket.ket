@@ -1,0 +1,22 @@
+---
+params: [app: String, title: String]
+---
+---
+params: [heading: String, body: String]
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%%= heading %> · <%= title %></title>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <main class="auth">
+      <span class="brand"><%= title %></span>
+      <h1><%%= heading %></h1>
+      <%%== body %>
+    </main>
+  </body>
+</html>
