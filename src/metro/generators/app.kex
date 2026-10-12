@@ -16,8 +16,8 @@ module Metro.Generators.App
 # Where a new app's dependencies come from.
 record Sources do
   harmat : String = "https://github.com/kexhq/harmat"
-  harmatBranch : String = "database-migrations-repositories"
-  metro : String = "https://github.com/akoskovacs/metro"
+  harmatBranch : String = "main"
+  metro : String = "https://github.com/kexhq/metro"
   metroBranch : String = "main"
 end
 

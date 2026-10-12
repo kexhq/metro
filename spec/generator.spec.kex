@@ -36,6 +36,10 @@ describe("Metro.Generators.App") do
     let page = written("app/views/home/index.html.ket")
     Assert.truthy(page.startsWith?("---\nparams: ["))
     Assert.truthy(page.contains?("<%= ") && !page.contains?("<%%"))
+    # The database is installed around the routes, not handed to them.
+    Assert.truthy(written("main.kex").contains?("with Harmat.Connection = DB.Store.StoreConnection { store: store } do"))
+    Assert.truthy(written("config/routes.kex").contains?("foul routes(hub) do"))
+    Assert.truthy(written("db/repositories/users.kex").contains?("Database.select().from(DB.Schema.Users)"))
     # Nothing of the generator's own is left in what it writes.
     Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("<%= app %>") || text.contains?("<%= title %>") end })
   end

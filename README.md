@@ -126,18 +126,13 @@ and sessions migrations, registration and sign-in behind plugs, one live page
 to start from, a setup script, a smoke spec, and a `Dockerfile` and
 `docker-compose.yml` that run the application beside PostgreSQL.
 
-> The generated Kex sources are behind Harmat: they still hand a database
-> to every action, as Harmat needed before `Harmat.Connection`. Until the
-> templates are brought up — the way [Slick](https://github.com/akoskovacs/slick)
-> was — a generated application does not build against the current Harmat.
-
 It is a Tey plugin, `metro:app`, run from a package that depends on Metro:
 
 ```sh
 mkdir chat && cd chat
 tey init chat --app
 tey add harmat --git https://github.com/kexhq/harmat --branch main
-tey add metro --git https://github.com/akoskovacs/metro --branch main   # asks to approve the plugin
+tey add metro --git https://github.com/kexhq/metro --branch main   # asks to approve the plugin
 tey generate metro:app --force     # --force: it replaces what `tey init` wrote
 sh script/setup.sh                 # dependencies, the ODBC port program
 tey server                         # http://127.0.0.1:4000

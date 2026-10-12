@@ -8,12 +8,12 @@ params: [app: String, title: String]
 # statement is run by it. That also serializes every read and write, which is
 # enough concurrency control to start with.
 #
-# Nothing outside db/ calls a slot. Repositories reach the database through
-# `gateway`, which is this process seen as a `Harmat.Db.Gateway`.
+# Nothing outside db/ calls a slot. Queries reach the database through
+# `Harmat.Connection`, which `StoreConnection` — this process, seen from any
+# other — is installed as wherever requests are served (main.kex).
 module DB.Store
 
-using Harmat.Database, only: [Statement]
-using Harmat.Db, only: [Gateway]
+using Harmat.Odbc, only: [Statement]
 
 record Store do
   connection : Any = :closed
@@ -30,8 +30,8 @@ serving Store do
     match sound() do
       Error(reason) => return { reply: Error(reason) }
       Ok(head) => do
-        Harmat.Database.sideload(ODBC)
-        match Harmat.Database.connect(dsn) do
+        Harmat.Odbc.sideload(ODBC)
+        match Harmat.Odbc.connect(dsn) do
           Error(reason) => return { reply: Error(reason) }
           Ok(connection) => do
             new.connection = connection
@@ -53,11 +53,11 @@ serving Store do
   end
 
   foul slot ran(statement: Statement) -> Reply<Result<Integer, String>> do
-    return { reply: Harmat.Database.execute(@connection, statement) }
+    return { reply: Harmat.Odbc.execute(@connection, statement) }
   end
 
   foul slot asked(statement: Statement) -> Reply<Result<[[String]], String>> do
-    return { reply: Harmat.Database.query(@connection, statement) }
+    return { reply: Harmat.Odbc.query(@connection, statement) }
   end
 end
 
@@ -72,12 +72,22 @@ foul started(dsn) do
   end
 end
 
-# The store as repositories use it, from any process.
-gateway : Server<Store> -> Gateway
-foul gateway(store) = Gateway {
-  run: do |statement| flat(store.ran(statement)) end,
-  ask: do |statement| flat(store.asked(statement)) end
-}
+# The store as queries use it, from any process:
+#
+#   with Harmat.Connection = StoreConnection { store: store } do … end
+record StoreConnection do
+  store : Server<Store>
+end
+
+make StoreConnection, implement: Harmat.Connection do
+  foul run(statement: Harmat.Odbc.Statement) -> Result<Integer, String> do
+    return flat(@store.ran(statement))
+  end
+
+  foul ask(statement: Harmat.Odbc.Statement) -> Result<[[String]], String> do
+    return flat(@store.asked(statement))
+  end
+end
 
 migrate : Server<Store> -> Result<[String], String>
 foul migrate(store) = flat(store.migrated(within: 120_000))

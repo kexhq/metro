@@ -45,11 +45,7 @@ foul host = ENV.get("HOST").or("127.0.0.1")
 make Environment do
   # The environment as METRO_ENV spells it.
   label :> String
-  let label do
-    match this do
-      Development => "development"
-      Test => "test"
-      Production => "production"
-    end
-  end
+  let label(@Development) = "development"
+  let label(@Test) = "test"
+  let label(@Production) = "production"
 end

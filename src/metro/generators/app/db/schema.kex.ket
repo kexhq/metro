@@ -7,5 +7,14 @@ module DB.Schema
 
 using Harmat.Table, only: [Definition]
 
+# Each table under the name of its own module, so that a query reads
+# `.from(DB.Schema.Users)` and a condition `DB.Schema.Users.email.eq(email)`:
+# the name alone is the table, and a name after it is one of its columns.
+let Users = DB.Schema.Users.definition
+let Sessions = DB.Schema.Sessions.definition
+
 tables : [Definition]
-let tables = [DB.Schema.Users.definition, DB.Schema.Sessions.definition]
+let tables = [
+  DB.Schema.Users,
+  DB.Schema.Sessions
+]

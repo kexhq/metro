@@ -3,7 +3,7 @@ params: [app: String, title: String]
 ---
 # <%= title %>
 
-A [Metro](https://github.com/akoskovacs/metro) application.
+A [Metro](https://github.com/kexhq/metro) application.
 
 ```sh
 sh script/setup.sh # once: dependencies, the ODBC port program
