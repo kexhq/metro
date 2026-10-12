@@ -11,10 +11,6 @@ params: [app: String, title: String]
 # (`Metro.Environment`); the environment and DATABASE_DSN choose the database
 # (config/database.kex).
 
-# Project modules are named in full here rather than brought in with `using`:
-# with `src` linked to this directory, a `using` in the entrypoint finds each
-# module twice and warns about it.
-
 foul failed(reason: String) -> Void do
   IO.printError("<%= app %>: ${reason}")
   System.exit(1)
@@ -46,9 +42,13 @@ foul served(store: Server<DB.Store.Store>) -> Void do
   let port = Metro.Environment.port()
   let bindHost = Metro.Environment.host()
   let environment = Metro.Environment.current().map { |running| running.label }.or("")
-  let site = Config.Routes.routes(store, Process.spawn(Metro.Live.Hub.Hub {}))
   IO.printLine("<%= title %> (${environment}) is on http://${bindHost == "0.0.0.0" then "localhost" else bindHost}:${port}")
-  site.start(bindHost, port).try
+  # Everything that serves is made in here, the routes included: this is
+  # where the store becomes the database every query reaches.
+  with Harmat.Connection = DB.Store.StoreConnection { store: store } do
+    let site = Config.Routes.routes(Process.spawn(Metro.Live.Hub.Hub {}))
+    site.start(bindHost, port).try
+  end
 end
 
 foul commanded(store: Server<DB.Store.Store>, args: [String]) -> Void do

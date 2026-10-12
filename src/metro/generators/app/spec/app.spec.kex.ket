@@ -16,28 +16,32 @@ describe("<%= title %>") do
   end
 
   it("registers, signs in and out") do
-    let file = "db/spec_${BEAM.erlang.system_time(:millisecond)}.sqlite3"
+    let file = "db/spec_${Metro.Clock.milliseconds()}.sqlite3"
     let store = DB.Store.started(Config.Database.sqlite(file)).try
     DB.Store.migrate(store).try
-    let site = Config.Routes.routes(store, Process.spawn(Metro.Live.Hub.Hub {}))
-    Assert.truthy(site.table.count > 0)
-    # Over HTTP: nobody signed in is sent to sign in, and can.
-    Assert.equal(site.call(Metro.WebRequest.asked("GET", "/")).outgoing.get("Location"), Just("/signin"))
-    Assert.equal(site.call(Metro.WebRequest.asked("GET", "/signin")).code, 200)
-    Assert.equal(site.call(Metro.WebRequest.asked("POST", "/signin", [("Host", "app.test"), ("Origin", "http://evil.example")], "")).code, 403)
-    let database = Harmat.Db.over(DB.Store.gateway(store))
+    with Harmat.Connection = DB.Store.StoreConnection { store: store } do
+      let site = Config.Routes.routes(Process.spawn(Metro.Live.Hub.Hub {}))
+      Assert.truthy(site.table.count > 0)
+      # Over HTTP: nobody signed in is sent to sign in, and can.
+      Assert.equal(site.call(Metro.WebRequest.asked("GET", "/")).outgoing.get("Location"), Just("/signin"))
+      Assert.equal(site.call(Metro.WebRequest.asked("GET", "/signin")).code, 200)
+      Assert.equal(site.call(Metro.WebRequest.asked("POST", "/signin", [("Host", "app.test"), ("Origin", "http://evil.example")], "")).code, 403)
+      let here = [("Host", "app.test"), ("Origin", "http://app.test")]
+      let registered = site.call(Metro.WebRequest.asked("POST", "/register", here, "email=bob%40example.com&password=correct+horse+battery"))
+      Assert.equal(registered.outgoing.get("Location"), Just("/"))
 
-    Assert.truthy(App.Services.Authentication.register(database, "ada", "short").error?)
-    let token = App.Services.Authentication.register(database, "Ada@Example.com", "correct horse battery").try
-    let ada : User = App.Services.Authentication.current(database, Just(token)).try
-    Assert.equal(ada.email, "ada@example.com")
-    Assert.truthy(App.Services.Authentication.register(database, "ada@example.com", "correct horse battery").error?)
-    Assert.truthy(App.Services.Authentication.signIn(database, "ada@example.com", "wrong password!").error?)
+      Assert.truthy(App.Services.Authentication.register("ada", "short").error?)
+      let token = App.Services.Authentication.register("Ada@Example.com", "correct horse battery").try
+      let ada : User = App.Services.Authentication.current(Just(token)).try
+      Assert.equal(ada.email, "ada@example.com")
+      Assert.truthy(App.Services.Authentication.register("ada@example.com", "correct horse battery").error?)
+      Assert.truthy(App.Services.Authentication.signIn("ada@example.com", "wrong password!").error?)
 
-    let again = App.Services.Authentication.signIn(database, "ada@example.com", "correct horse battery").try
-    App.Services.Authentication.signOut(database, Just(again))
-    Assert.equal(App.Services.Authentication.current(database, Just(again)), None)
-    Assert.truthy(App.Services.Authentication.current(database, Just(token)).set?)
+      let again = App.Services.Authentication.signIn("ada@example.com", "correct horse battery").try
+      App.Services.Authentication.signOut(Just(again))
+      Assert.equal(App.Services.Authentication.current(Just(again)), None)
+      Assert.truthy(App.Services.Authentication.current(Just(token)).set?)
+    end
     FS.File.delete(file)
   end
 

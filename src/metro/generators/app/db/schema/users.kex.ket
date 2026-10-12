@@ -9,12 +9,10 @@ using Harmat.Table, as: Table
 using Harmat.Table, only: [Definition]
 
 let definition = Table.define :users do |t|
-  [
-    t.text(:id, primaryKey: true),
-    t.text(:email),
-    t.text(:password_hash),
-    t.text(:created_at)
-  ]
+  t.text(:id, primaryKey: true)
+  t.text(:email)
+  t.text(:password_hash)
+  t.text(:created_at)
 end
 
 let table = DB.Schema.Users.definition.table
