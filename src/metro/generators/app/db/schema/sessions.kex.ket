@@ -9,12 +9,10 @@ using Harmat.Table, as: Table
 using Harmat.Table, only: [Definition]
 
 let definition = Table.define :sessions do |t|
-  [
-    t.text(:token_digest, primaryKey: true),
-    t.text(:user_id),
-    t.bigint(:expires_at),
-    t.text(:created_at)
-  ]
+  t.text(:token_digest, primaryKey: true)
+  t.text(:user_id)
+  t.bigint(:expires_at)
+  t.text(:created_at)
 end
 
 let table = DB.Schema.Sessions.definition.table
