@@ -20,11 +20,7 @@ module Metro.Decimal
 scaled : String -> Integer -> Integer?
 let scaled(text, digits) do
   let cleaned = text.trim.replace(" ", "").replace("_", "").replace(",", ".")
-  match cleaned.split(".") do
-    [whole] => combined(whole, "", digits)
-    [whole, fraction] => combined(whole, fraction, digits)
-    _ => None
-  end
+  divided(cleaned.split("."), digits)
 end
 
 # A scaled value with digit grouping and every decimal place: 125050 at two
@@ -59,6 +55,11 @@ private do
     let padded = "${fraction}000000000000".take(digits)
     valid then "${whole}${padded}".to(Integer) else None
   end
+
+  divided : [String] -> Integer -> Integer?
+  let divided([whole], digits) = combined(whole, "", digits)
+  let divided([whole, fraction], digits) = combined(whole, fraction, digits)
+  let divided(_, _) = None
 
   digits? : String -> Bool
   let digits?(text) = text.chars.all? { |char| char.digit? }

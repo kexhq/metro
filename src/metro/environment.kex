@@ -25,13 +25,14 @@ let VARIABLE = "METRO_ENV"
 # that is none of the three is an error, not a guess: a misspelt
 # `production` must not quietly run as development.
 current : Result<Environment, String>
-foul current do
-  match ENV.get(VARIABLE).or("development") do
-    "development" => Ok(Development)
-    "test" => Ok(Test)
-    "production" => Ok(Production)
-    other => Error("${VARIABLE} must be development, test or production, not ${other}")
-  end
+foul current = named(ENV.get(VARIABLE).or("development"))
+
+private do
+  named : String -> Result<Environment, String>
+  let named("development") = Ok(Development)
+  let named("test") = Ok(Test)
+  let named("production") = Ok(Production)
+  let named(other) = Error("${VARIABLE} must be development, test or production, not ${other}")
 end
 
 # The port to listen on.
