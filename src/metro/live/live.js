@@ -121,7 +121,7 @@
     // Choosing from a menu closes it.
     const menu = button.closest("details[data-menu]");
     if (menu) menu.open = false;
-    clearTimeout(typing);
+    flush();
     send({ ...button.dataset });
   });
 
@@ -194,6 +194,7 @@
     if (!form) return;
     submission.preventDefault();
     clearTimeout(typing);
+    if (pending === form) pending = null;
     sendForm(form, form.dataset.live);
     // `data-live-reset`: a form that is sent and then empty again — a message
     // box. The server's reply cannot clear it, because what the person is
@@ -217,8 +218,24 @@
     const form = input.target.closest("form[data-live]");
     // `data-live-quiet`: a form the server only hears from when it is sent.
     if (!form || form.hasAttribute("data-live-quiet")) return;
+    // `data-live-change="draft"` names the event sent while it is typed
+    // into, `change` unless it says; `data-live-pause` how many milliseconds
+    // of quiet to wait for first.
     clearTimeout(typing);
-    typing = setTimeout(() => sendForm(form, "change"), TYPING_PAUSE);
+    pending = form;
+    typing = setTimeout(flush, Number(form.dataset.livePause) || TYPING_PAUSE);
+  });
+
+  // What was typed and not yet told goes at once when the field is left, so
+  // a click elsewhere — and the patch it brings back — comes after it.
+  let pending = null;
+  function flush() {
+    clearTimeout(typing);
+    if (pending && document.contains(pending)) sendForm(pending, pending.dataset.liveChange || "change");
+    pending = null;
+  }
+  app.addEventListener("focusout", (left) => {
+    if (pending && pending.contains(left.target)) flush();
   });
 
   // `data-live-until="<milliseconds since 1970>"`: something true for a

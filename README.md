@@ -182,7 +182,10 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
 - A click on any element with `data-event="name"` sends that event with the
   element's other `data-*` attributes as fields.
 - A `<form data-live="save">` sends its fields as `save` on submit, and as
-  `change` while it is being typed into.
+  `change` while it is being typed into — once the typing pauses, and at once
+  when the field is left. `data-live-change="draft"` names that event
+  instead, and `data-live-pause="1000"` makes the pause that many
+  milliseconds: a message box that keeps a draft.
 - An element with class `backdrop` is a modal: Escape or a click on the
   backdrop sends `cancel`, and Tab stays inside it.
 - `data-live-reset` on a form empties it once it is sent (a message box);
