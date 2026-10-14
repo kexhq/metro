@@ -36,8 +36,9 @@
       show("live", "Live");
       // A reconnect starts a new session on the server, which knows nothing
       // of a form left open here; sending it back restores the draft.
-      const form = app.querySelector("form[data-live]");
-      if (form) sendForm(form, "change");
+      const form = app.querySelector("form[data-live]:not([data-live-quiet])");
+      if (form) sendForm(form, form.dataset.liveChange || "change");
+      attend(true);
     });
 
     socket.addEventListener("message", (message) => {
@@ -52,6 +53,23 @@
       setTimeout(connect, Math.min(5000, 250 * 2 ** attempts));
     });
   }
+
+  // --- Attention ------------------------------------------------------------
+
+  // The server is told whether the page is in front of the person — shown,
+  // and its window focused — as an `attention` event with `on` "true" or
+  // "false": when the socket opens, and whenever that changes. A page can be
+  // open without being looked at; what arrives then has not been seen.
+  let attending = null;
+  function attend(always) {
+    const now = document.visibilityState === "visible" && document.hasFocus();
+    if (!always && now === attending) return;
+    attending = now;
+    send({ event: "attention", on: String(now) });
+  }
+  document.addEventListener("visibilitychange", () => attend(false));
+  window.addEventListener("focus", () => attend(false));
+  window.addEventListener("blur", () => attend(false));
 
   // --- The address bar ------------------------------------------------------
 

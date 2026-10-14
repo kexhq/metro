@@ -211,6 +211,10 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   around it.
 - `<details data-menu>` is a menu: it stays open across patches, and closes
   when something in it is chosen, on a click elsewhere, or on Escape.
+- The server is told whether the page is in front of the person — shown,
+  and its window focused — as an `attention` event with `on` "true" or
+  "false", when the socket opens and whenever that changes: what arrives
+  while nobody looks has not been seen.
 - `data-live-typing` on a live form sends a `typing` event, at most every few
   seconds, while somebody types in it; `data-live-until="<ms since 1970>"`
   takes an element off the page when its time is up. `Metro.Live.Presence`
