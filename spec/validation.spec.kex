@@ -1,4 +1,4 @@
-using Metro.Validation, only: [Changeset, rules, validates, inOrder, present, sized, decimal, moreThanZero, atMost, calendarDate, emailAddress, passing]
+using Metro.Validation, only: [Changeset, rules, validates, inOrder, present, sized, decimal, moreThanZero, atMost, calendarDate, emailAddress, timeZone, passing]
 
 let signup = rules do
   validates("email", "Email", [present, emailAddress])
@@ -12,6 +12,7 @@ let loan = rules do
   validates("quantity", "Shares", [decimal(4, "10.5"), moreThanZero(4)])
   validates("startDate", "Start date", [calendarDate])
   validates("endDate", "End date", [calendarDate])
+  validates("zone", "Time zone", [timeZone])
   validates("currency", "Currency", [passing("must be a three-letter code.") { |text| text.length == 3 }])
   inOrder("startDate", "endDate", "The end date is before the start date.")
 end
@@ -66,5 +67,20 @@ describe("Metro.Validation") do
   it("keeps only the fields a form is permitted to set") do
     let sent = [("email", Just("a@b.co")), ("admin", Just("true")), ("flag", None)]
     Assert.equal(Metro.Validation.permitted(sent, ["email", "password"]), {"email": "a@b.co"})
+  end
+
+  it("knows the time zones by name, as written") do
+    Assert.truthy(Metro.TimeZones.known?("Europe/Budapest"))
+    Assert.truthy(Metro.TimeZones.known?("America/Argentina/Buenos_Aires"))
+    Assert.truthy(Metro.TimeZones.known?("UTC"))
+    Assert.falsy(Metro.TimeZones.known?("europe/budapest"))
+    Assert.falsy(Metro.TimeZones.known?("Mars/Olympus_Mons"))
+    Assert.equal(Metro.TimeZones.NAMES.first, Just("Africa/Abidjan"))
+    Assert.equal(Metro.TimeZones.NAMES.last, Just("UTC"))
+    Assert.equal(Metro.TimeZones.NAMES.uniq.count, Metro.TimeZones.NAMES.count)
+    let zoned = Metro.Validation.checked(loan, {"name": "x", "value": "1", "zone": "Nowhere/Else"})
+    Assert.equal(zoned.on("zone"), ["Time zone must be a time zone like Europe/Budapest."])
+    Assert.equal(Metro.Validation.checked(loan, {"name": "x", "value": "1", "zone": "Asia/Tokyo"}).on("zone"), [])
+    Assert.equal(Metro.Validation.checked(loan, {"name": "x", "value": "1"}).on("zone"), [])
   end
 end

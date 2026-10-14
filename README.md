@@ -19,6 +19,7 @@ and Metro does not depend on it.
 | `Metro.Auth.Password`, `Metro.Auth.Token`, `Metro.Cookies` | password hashes, session tokens, cookies |
 | `Metro.Environment` | `METRO_ENV`, `PORT` and `HOST` |
 | `Metro.Clock`, `Metro.Id` | the time as a number; ids for rows |
+| `Metro.TimeZones` | the names of the world's time zones |
 | `Metro.Assets`, `Metro.Static` | stylesheets addressed by their contents; files of `public/` |
 | `Metro.Decimal` | decimals as scaled integers |
 
@@ -233,7 +234,8 @@ changeset.on("email")     # ["Email is required."]
 ```
 
 Checks: `present`, `sized`, `decimal`, `moreThanZero`, `atMost`,
-`calendarDate`, `emailAddress`, and `passing` for one of your own.
+`calendarDate`, `emailAddress`, `timeZone`, and `passing` for one of your
+own.
 `Metro.Validation.permitted(entries, names)` keeps only the fields a form may
 set.
 
@@ -272,6 +274,11 @@ it moves these too. A generated id is its kind's prefix, the microsecond it
 was made in and a serial number: the prefix says what it is an id of
 wherever it turns up, and the time keeps ids of one kind in the order they
 were made.
+
+`Metro.TimeZones.NAMES` lists the IANA time zone names — one for each
+place in tzdata's zone.tab, and UTC — for a person to pick theirs from;
+`known?(name)` says whether a name is one, and the `timeZone` check asks it
+of a form's field. They are names only, until Kex's clock knows named zones.
 
 ## Also
 

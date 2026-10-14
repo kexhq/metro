@@ -16,6 +16,7 @@
 #   Metro.Environment    METRO_ENV, PORT and HOST: where the process runs
 #   Metro.Clock          the time as seconds, milliseconds or microseconds
 #   Metro.Id             ids for rows, and serial numbers for tabs
+#   Metro.TimeZones      the names of the world's time zones
 #
 # Requests are routed by `Metro.Router`, on Kex's `Net.HTTP`. README.md is
 # the guide.
@@ -32,4 +33,5 @@ module Metro do
   export Metro.Environment
   export Metro.Clock
   export Metro.Id
+  export Metro.TimeZones
 end

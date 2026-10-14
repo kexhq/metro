@@ -28,6 +28,7 @@ type Check = Present
   | AtMost(Integer, Integer, String)
   | CalendarDate
   | EmailAddress
+  | TimeZone
   | Passing(String -> Bool, String)
 
 # One declaration in a rule list: checks on a field, or an order two fields
@@ -99,6 +100,9 @@ let calendarDate = CalendarDate
 
 # Must look like an email address.
 let emailAddress = EmailAddress
+
+# Must be the name of a time zone: `Metro.TimeZones`.
+let timeZone = TimeZone
 
 # Must pass a test of the application's own; `complaint` ends the sentence.
 passing : String -> (String -> Bool) -> Check
@@ -175,5 +179,6 @@ private do
     let shaped = parts.count == 2 && !parts.first.or("").empty? && parts.last.or("").contains?(".") && !text.contains?(" ")
     shaped && text.length <= 254 then None else Just("must be an address like you@example.com.")
   end
+  let failure(TimeZone, text) = Metro.TimeZones.known?(text) then None else Just("must be a time zone like Europe/Budapest.")
   let failure(Passing(test, complaint), text) = test(text) then None else Just(complaint)
 end
