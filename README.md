@@ -212,6 +212,13 @@ The browser half is one script, served by `Metro.Live.Client.route()`:
   around it.
 - `<details data-menu>` is a menu: it stays open across patches, and closes
   when something in it is chosen, on a click elsewhere, or on Escape.
+- `data-live-hook="Name"` gives an element the application's own script:
+  `window.Metro.hooks.Name`, an object with `mounted()`, `updated()` and
+  `destroyed()`, called with `this.el` the element and `this.send(fields)`
+  to send an event. Register hooks in a script of your own
+  (`(window.Metro = window.Metro || {}).hooks = { … }`), before or after
+  Metro's. What a hook adds inside the live region is patched away: put it
+  on `document.body`, or under `data-live-keep`.
 - The server is told whether the page is in front of the person — shown,
   and its window focused — as an `attention` event with `on` "true" or
   "false", when the socket opens and whenever that changes: what arrives
@@ -243,7 +250,9 @@ changeset.on("email")     # ["Email is required."]
 
 Checks: `present`, `sized`, `decimal`, `moreThanZero`, `atMost`,
 `calendarDate`, `emailAddress`, `timeZone`, and `passing` for one of your
-own.
+own. Besides `validates`, a rule list takes `inOrder(earlier, later,
+message)` for two dates, and `confirmed(field, again, message)` for a
+password typed twice: compared exactly, and only when the second is given.
 `Metro.Validation.permitted(entries, names)` keeps only the fields a form may
 set.
 

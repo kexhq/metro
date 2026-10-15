@@ -31,9 +31,11 @@ type Check = Present
   | TimeZone
   | Passing(String -> Bool, String)
 
-# One declaration in a rule list: checks on a field, or an order two fields
-# must be in.
-type Rule = Validates(String, String, [Check]) | InOrder(String, String, String)
+# One declaration in a rule list: checks on a field, an order two fields
+# must be in, or a field typed again in another.
+type Rule = Validates(String, String, [Check])
+  | InOrder(String, String, String)
+  | Confirms(String, String, String)
 
 # What checking found: the values as given, and every problem as
 # (field name, message), in the order the rules were declared.
@@ -71,6 +73,16 @@ let validates(name, label, checks) = Validates(name, label, checks)
 # are given. ISO dates sort as text, which is what this is for.
 inOrder : String -> String -> String -> Rule
 let inOrder(earlier, later, message) = InOrder(earlier, later, message)
+
+# Declares that a field must be typed again, the same, in a second one: a
+# password and its confirmation, as Rails' `confirmation: true`. They are
+# compared exactly as typed, spaces and all. Without the second field among
+# the values — a program creating an account, not a form — there is nothing
+# to compare, and nothing is wrong.
+#
+#   confirmed("password", "password_confirmation", "The passwords do not match.")
+confirmed : String -> String -> String -> Rule
+let confirmed(name, confirmation, message) = Confirms(name, confirmation, message)
 
 # --- Checks -----------------------------------------------------------------
 
@@ -151,6 +163,12 @@ private do
     let second = given(values, later)
     first.empty? || second.empty? || first <= second then [] else [(later, message)]
   end
+  let broken(Confirms(name, confirmation, message), values) do
+    match values.get(confirmation) do
+      None => []
+      Just(again) => again == values.get(name).or("") then [] else [(confirmation, message)]
+    end
+  end
 
   # What is wrong with a value, as the end of a sentence, or nothing.
   failure : Check -> String -> String?
@@ -179,6 +197,9 @@ private do
     let shaped = parts.count == 2 && !parts.first.or("").empty? && parts.last.or("").contains?(".") && !text.contains?(" ")
     shaped && text.length <= 254 then None else Just("must be an address like you@example.com.")
   end
-  let failure(TimeZone, text) = Metro.TimeZones.known?(text) then None else Just("must be a time zone like Europe/Budapest.")
+  let failure(TimeZone, text) do
+    return None if Metro.TimeZones.known?(text)
+    Just("must be a time zone like Europe/Budapest.")
+  end
   let failure(Passing(test, complaint), text) = test(text) then None else Just(complaint)
 end

@@ -134,6 +134,58 @@
   window.addEventListener("dragover", (over) => { if (carriesFiles(over) && !zoneOf(over.target)) over.preventDefault(); });
   window.addEventListener("drop", (dropped) => { if (carriesFiles(dropped) && !zoneOf(dropped.target)) dropped.preventDefault(); });
 
+  // --- Hooks ----------------------------------------------------------------
+
+  // `data-live-hook="Name"` on an element of the live region gives it the
+  // application's own behaviour: `Metro.hooks.Name`, an object with any of
+  // `mounted()`, `updated()` and `destroyed()`. Each is called with `this`
+  // an object of the element's own — made from the hook, so it can keep
+  // state — whose `el` is the element and whose `send(fields)` sends an
+  // event as a click would. `mounted` when the element first appears,
+  // `updated` after every patch while it stays, `destroyed` once it is gone.
+  //
+  // An application registers its hooks in a script of its own, before or
+  // after this one:
+  //
+  //   (window.Metro = window.Metro || {}).hooks = { Composer: { mounted() { … } } };
+  //
+  // A patch makes the live region what the server said, so what a hook adds
+  // inside it is taken away again: put it outside the region (on
+  // `document.body`), or inside an element marked `data-live-keep`.
+  const Metro = (window.Metro = window.Metro || {});
+  Metro.hooks = Metro.hooks || {};
+  Metro.send = (fields) => send(fields);
+  const living = new Map();
+
+  function hooked() {
+    for (const [element, instance] of living) {
+      if (document.contains(element) && element.dataset.liveHook === instance.hookName) continue;
+      living.delete(element);
+      if (instance.destroyed) instance.destroyed();
+    }
+    for (const element of app.querySelectorAll("[data-live-hook]")) {
+      const known = living.get(element);
+      if (known) {
+        if (known.updated) known.updated();
+        continue;
+      }
+      const hook = Metro.hooks[element.dataset.liveHook];
+      if (!hook) continue;
+      const instance = Object.assign(Object.create(hook), {
+        el: element,
+        hookName: element.dataset.liveHook,
+        send: (fields) => send(fields),
+      });
+      living.set(element, instance);
+      if (instance.mounted) instance.mounted();
+    }
+  }
+
+  // The page as it was served is mounted once the application's own
+  // scripts, wherever they are, have registered their hooks.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", hooked);
+  else setTimeout(hooked, 0);
+
   // --- Attention ------------------------------------------------------------
 
   // The server is told whether the page is in front of the person — shown,
@@ -384,6 +436,7 @@
     if (!editor && wasOpen && opener && document.contains(opener)) opener.focus();
     const problem = app.querySelector(".field.invalid input, .field.invalid textarea");
     if (problem && editor && !editor.contains(document.activeElement)) problem.focus();
+    hooked();
   }
 
   // Makes `current`'s children match `wanted`'s, reusing the nodes that are
