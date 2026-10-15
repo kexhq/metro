@@ -32,6 +32,17 @@ let field(entries, name) do
   end
 end
 
+# Every value of a field an event sent more than once, in the order sent:
+# the boxes ticked in a list of checkboxes of one name. Empty when it was
+# not sent.
+repeated : [(String, String?)] -> String -> [String]
+let repeated(entries, name) = entries.flatMap { |entry|
+  match entry do
+    (key, Just(value)) => key == name then [value] else []
+    _ => []
+  end
+}
+
 # Serves one connection until the browser goes away.
 #
 # @param socket [Connection] the upgraded connection

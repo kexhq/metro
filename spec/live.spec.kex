@@ -6,6 +6,13 @@ describe("Metro.Live.Socket") do
     Assert.equal(Metro.Live.Socket.field(entries, "notes"), "")
     Assert.equal(Metro.Live.Socket.field(entries, "missing"), "")
   end
+
+  it("reads every value of a field sent more than once") do
+    let entries = Metro.Live.Socket.decoded("event=pick&person=u1&person=u2&note=")
+    Assert.equal(Metro.Live.Socket.repeated(entries, "person"), ["u1", "u2"])
+    Assert.equal(Metro.Live.Socket.repeated(entries, "note"), [""])
+    Assert.equal(Metro.Live.Socket.repeated(entries, "missing"), [])
+  end
 end
 
 describe("Metro.Live.Client") do
