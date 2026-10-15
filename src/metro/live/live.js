@@ -54,6 +54,86 @@
     });
   }
 
+  // --- Uploads --------------------------------------------------------------
+
+  // `data-live-drop="share"` on an element of the live region: files dropped
+  // on it, pasted into it, or chosen in a file input inside it are each sent
+  // to `data-live-upload` (`/uploads` unless it says) as the body of a POST,
+  // their name in `X-Filename` and their type in `Content-Type` — what
+  // `Metro.Storage.received` reads. Then the event it names is sent with
+  // the fields the server answered with, as JSON; or, when it refused,
+  // `<event>-failed` with `filename` and `reason`. The element is marked
+  // `data-live-dragging` while files are over it and `data-live-uploading`
+  // while some are on their way; a patch leaves both alone.
+  function zoneOf(target) {
+    return target && target.closest ? target.closest("[data-live-drop]") : null;
+  }
+
+  function carriesFiles(event) {
+    return Array.from((event.dataTransfer && event.dataTransfer.types) || []).includes("Files");
+  }
+
+  async function upload(zone, files) {
+    const event = zone.dataset.liveDrop;
+    const address = zone.dataset.liveUpload || "/uploads";
+    let waiting = Number(zone.getAttribute("data-live-uploading")) || 0;
+    zone.setAttribute("data-live-uploading", String(waiting + files.length));
+    for (const file of files) {
+      const name = file.name || "upload";
+      try {
+        const answer = await fetch(address, {
+          method: "POST",
+          body: file,
+          credentials: "same-origin",
+          headers: { "Content-Type": file.type || "application/octet-stream", "X-Filename": encodeURIComponent(name) },
+        });
+        const fields = await answer.json().catch(() => ({}));
+        if (answer.ok) send({ ...fields, event: event });
+        else send({ event: event + "-failed", filename: name, reason: fields.error || answer.statusText });
+      } catch (failure) {
+        send({ event: event + "-failed", filename: name, reason: String(failure) });
+      }
+      waiting = (Number(zone.getAttribute("data-live-uploading")) || 1) - 1;
+      if (waiting > 0) zone.setAttribute("data-live-uploading", String(waiting));
+      else zone.removeAttribute("data-live-uploading");
+    }
+  }
+
+  app.addEventListener("dragover", (over) => {
+    const zone = zoneOf(over.target);
+    if (!zone || !carriesFiles(over)) return;
+    over.preventDefault();
+    zone.setAttribute("data-live-dragging", "");
+  });
+  app.addEventListener("dragleave", (left) => {
+    const zone = zoneOf(left.target);
+    if (zone && !zone.contains(left.relatedTarget)) zone.removeAttribute("data-live-dragging");
+  });
+  app.addEventListener("drop", (dropped) => {
+    const zone = zoneOf(dropped.target);
+    if (!zone || !carriesFiles(dropped)) return;
+    dropped.preventDefault();
+    zone.removeAttribute("data-live-dragging");
+    upload(zone, Array.from(dropped.dataTransfer.files));
+  });
+  app.addEventListener("paste", (pasted) => {
+    const zone = zoneOf(pasted.target);
+    const files = Array.from((pasted.clipboardData && pasted.clipboardData.files) || []);
+    if (!zone || files.length === 0) return;
+    pasted.preventDefault();
+    upload(zone, files);
+  });
+  app.addEventListener("change", (changed) => {
+    const input = changed.target;
+    const zone = zoneOf(input);
+    if (!zone || input.type !== "file" || !input.files || input.files.length === 0) return;
+    upload(zone, Array.from(input.files));
+    input.value = "";
+  });
+  // A file dropped anywhere else is not opened in place of the page.
+  window.addEventListener("dragover", (over) => { if (carriesFiles(over) && !zoneOf(over.target)) over.preventDefault(); });
+  window.addEventListener("drop", (dropped) => { if (carriesFiles(dropped) && !zoneOf(dropped.target)) dropped.preventDefault(); });
+
   // --- Attention ------------------------------------------------------------
 
   // The server is told whether the page is in front of the person — shown,
@@ -355,6 +435,8 @@
       // Whether a <details> is open is the person's doing, like what is
       // typed in a field.
       if (name === "open" && existing.nodeName === "DETAILS") continue;
+      // So is a file being dragged over it, or on its way up.
+      if (name === "data-live-dragging" || name === "data-live-uploading") continue;
       if (!next.hasAttribute(name)) existing.removeAttribute(name);
     }
     for (const name of next.getAttributeNames()) {

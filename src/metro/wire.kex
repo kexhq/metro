@@ -30,6 +30,10 @@ let headerOf(incoming, name) = incoming.raw.headers.get(name)
 textOf : Incoming -> String
 let textOf(incoming) = incoming.raw.body.to(String).or("")
 
+# The body as it came.
+bytesOf : Incoming -> Binary
+let bytesOf(incoming) = incoming.raw.body
+
 # A request made by hand, for specs.
 made : String -> String -> [(String, String)] -> String -> Incoming
 let made(method, address, headers, body) = Incoming { raw: Request {

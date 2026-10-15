@@ -1,0 +1,34 @@
+describe("Metro.Storage") do
+  it("keeps an upload in a folder under a new key, and answers with it safely") do
+    let root = "storage_spec_${Metro.Clock.milliseconds()}"
+    with Metro.Storage.Service = Metro.Storage.Disk { root: root } do
+      let incoming = Metro.Wire.made("POST", "/uploads", [("Content-Type", "image/png"), ("X-Filename", "a%20cat%2Fdog.png")], "PNGDATA")
+      let blob = Metro.Storage.received(Metro.WebRequest.WebRequest { incoming: incoming }).try
+      Assert.truthy(blob.key.startsWith?("f"))
+      Assert.equal(blob.filename, "dog.png")
+      Assert.equal(blob.contentType, "image/png")
+      Assert.equal(blob.byteSize, 7)
+      Assert.equal(blob.checksum, Digest.sha256("PNGDATA"))
+      Assert.equal(Metro.Storage.Service.fetch(blob.key).map { |content| content.to(String).or("") }, Ok("PNGDATA"))
+
+      let shown = Metro.Storage.served(Metro.WebRequest.WebRequest { incoming: incoming }, blob)
+      Assert.equal(shown.code, 200)
+      Assert.equal(shown.outgoing.get("Content-Disposition"), Just("inline; filename*=UTF-8''dog.png"))
+      Assert.equal(shown.outgoing.get("X-Content-Type-Options"), Just("nosniff"))
+
+      # What a browser could run is a download, never a page.
+      let page = Metro.Storage.Blob { ...blob, contentType: "text/html", filename: "x y.html" }
+      let downloaded = Metro.Storage.served(Metro.WebRequest.WebRequest { incoming: incoming }, page)
+      Assert.equal(downloaded.outgoing.get("Content-Disposition"), Just("attachment; filename*=UTF-8''x%20y.html"))
+
+      # Nothing for an empty body, nor a key that is a path.
+      let empty = Metro.Wire.made("POST", "/uploads", [], "")
+      Assert.truthy(Metro.Storage.received(Metro.WebRequest.WebRequest { incoming: empty }).error?)
+      Assert.truthy(Metro.Storage.Service.fetch("../etc/passwd").error?)
+
+      Metro.Storage.Service.discard(blob.key).try
+      Assert.truthy(Metro.Storage.Service.fetch(blob.key).error?)
+    end
+    FS.Directory.deleteAll(root)
+  end
+end

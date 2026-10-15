@@ -20,6 +20,7 @@ and Metro does not depend on it.
 | `Metro.Environment` | `METRO_ENV`, `PORT` and `HOST` |
 | `Metro.Clock`, `Metro.Id` | the time as a number; ids for rows |
 | `Metro.TimeZones` | the names of the world's time zones |
+| `Metro.Storage` | files people upload, kept in a folder or elsewhere |
 | `Metro.Assets`, `Metro.Static` | stylesheets addressed by their contents; files of `public/` |
 | `Metro.Decimal` | decimals as scaled integers |
 
@@ -286,6 +287,55 @@ were made.
 place in tzdata's zone.tab, and UTC — for a person to pick theirs from;
 `known?(name)` says whether a name is one, and the `timeZone` check asks it
 of a form's field. They are names only, until Kex's clock knows named zones.
+
+## Files people upload
+
+`Metro.Storage` keeps uploaded files, as Active Storage does: in a folder
+unless the application installs something else. A service is a capability,
+so swapping the folder for another provider is one `with` where the
+application starts:
+
+```kex
+# The default: ./storage, or METRO_STORAGE_ROOT.
+with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/app/files" } do
+  site.start(host, port)
+end
+```
+
+Another provider is a record that implements `store`, `fetch` and `discard`
+by key: `make S3, implement: Metro.Storage.Service do … end`. Metro has only the
+folder for now: S3 needs HMAC-SHA256 in Kex (kexhq/kex#459).
+
+A page marks where files may be dropped. Dropped, pasted or chosen files
+are POSTed one by one, each as a request's whole body; the event is then
+sent with whatever the upload route answered:
+
+```html
+<section data-live-drop="share">
+  … <input type="file" multiple>
+</section>
+```
+
+```kex
+post("/uploads", ~uploaded)   # behind the plugs that say who may upload
+
+foul uploaded(request: WebRequest) -> WebRequest do
+  match Metro.Storage.received(request) do
+    Ok(blob) => request.json(200, {"file": blob.key, "name": blob.filename})   # → a `share` event with these fields
+    Error(reason) => request.json(422, {"error": reason})                      # → `share-failed`
+  end
+end
+
+Metro.Storage.served(request, blob)   # the file, to someone allowed to see it
+```
+
+`received` takes the name from `X-Filename` and the type from
+`Content-Type`, stores the bytes under a new key and answers with a `Blob`:
+key, file name, type, size and SHA-256. What a file belongs to and who may
+read it is the application's to keep. `served` shows only pictures, plain
+text and PDF in the page, never sniffs, and sandboxes what it sends;
+anything else is a download. Net.HTTP refuses a body over 10 MiB
+(kexhq/kex#488).
 
 ## Also
 

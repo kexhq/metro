@@ -1,0 +1,149 @@
+# Metro.Storage — files people upload, kept somewhere: a folder unless the
+# application says otherwise, as Rails' Active Storage keeps them.
+#
+#   Metro.Storage.received(request)       an upload's bytes, stored: a Blob
+#   Metro.Storage.served(request, blob)   a stored file, answered safely
+#
+# Where files go is a capability, `Metro.Storage.Service`. Outside any
+# `with` it is a folder — `storage`, or METRO_STORAGE_ROOT — and an
+# application installs another service the way it installs a database:
+#
+#   with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/slick/files" } do
+#     site.start(host, port)
+#   end
+#
+# A service is anything that keeps bytes under a key and gives them back:
+# `make S3, implement: Metro.Storage.Service do … end` is another provider. What a
+# file is called and who may see it is the application's to keep, with the
+# Blob `received` gives it; the service only ever sees keys.
+#
+# An upload is the file itself as a request's body, its name in an
+# `X-Filename` header (URI-encoded) and its type in `Content-Type`: what the
+# live script's `data-live-drop` sends, and nothing to parse.
+capability Metro.Storage.Service do
+  # Keeps `content` under `key`, replacing what was there.
+  foul store(key: String, content: Binary, contentType: String) -> Result<Void, String> = Metro.Storage.Disk { root: Metro.Storage.root() }.store(key, content, contentType)
+
+  # What is kept under `key`.
+  foul fetch(key: String) -> Result<Binary, String> = Metro.Storage.Disk { root: Metro.Storage.root() }.fetch(key)
+
+  # Forgets what is kept under `key`; nothing kept there is no error.
+  foul discard(key: String) -> Result<Void, String> = Metro.Storage.Disk { root: Metro.Storage.root() }.discard(key)
+end
+
+module Metro.Storage do
+  using Metro.WebRequest, only: [WebRequest]
+
+  # The folder files are kept in when nothing else is installed.
+  root : String
+  foul root = ENV.get("METRO_STORAGE_ROOT").or("storage")
+
+  # The largest upload taken, in bytes. Net.HTTP's server refuses a body
+  # over 10 MiB before Metro sees it.
+  let LARGEST = 10485760
+
+  # A stored file: its key in the service, what it was called and what it
+  # is, how big, and the SHA-256 of its bytes in hex.
+  record Blob do
+    key : String
+    filename : String
+    contentType : String
+    byteSize : Integer
+    checksum : String
+  end
+
+  # A folder on this machine: each file at `<root>/<first two of its key>/<key>`,
+  # so that no one folder grows too long.
+  record Disk do
+    root : String
+  end
+
+  make Disk, implement: Metro.Storage.Service do
+    foul store(key: String, content: Binary, contentType: String) -> Result<Void, String> do
+      return Error("not a key: ${key}") if !Metro.Storage.key?(key)
+      let folder = "${@root}/${key.take(2)}"
+      FS.Directory.create(@root) if !FS.Directory.exists?(@root)
+      FS.Directory.create(folder) if !FS.Directory.exists?(folder)
+      return FS.File.writeBytes("${folder}/${key}", content) then Ok(()) else Error("could not write ${folder}/${key}")
+    end
+
+    foul fetch(key: String) -> Result<Binary, String> do
+      return Error("not a key: ${key}") if !Metro.Storage.key?(key)
+      match FS.File.readBytes("${@root}/${key.take(2)}/${key}") do
+        Ok(content) => return Ok(content)
+        Error(reason) => return Error("${reason}")
+      end
+    end
+
+    foul discard(key: String) -> Result<Void, String> do
+      return Error("not a key: ${key}") if !Metro.Storage.key?(key)
+      let path = "${@root}/${key.take(2)}/${key}"
+      FS.File.delete(path) if FS.File.exists?(path)
+      return Ok(())
+    end
+  end
+
+  # Whether a text can be a key: letters, digits and dashes only, so no key
+  # is a path out of a folder or a bucket.
+  key? : String -> Bool
+  let key?(text) = !text.empty? && text.chars.all? { |char| char.letter? || char.digit? || "${char}" == "-" }
+
+  # Stores the file a request uploads, under a new key: its Blob, or why
+  # not. Nothing is stored for an empty body or one over `LARGEST`.
+  received : WebRequest -> Result<Blob, String>
+  foul received(request) do
+    let content = request.requestBytes
+    return Error("The upload is empty.") if content.empty?
+    return Error("The upload is larger than ${LARGEST / 1048576} MB.") if content.length > LARGEST
+
+    let named = unescaped(request.header("X-Filename").or("")).trim
+    let filename = named.empty? then "upload" else named.split("/").last.or("upload")
+    let declared = request.header("Content-Type").or("").split(";").first.or("").trim.lowerCase
+    let blob = Blob {
+      key: Metro.Id.generate(prefix: "f"),
+      filename: filename.take(255),
+      contentType: declared.empty? then Metro.Static.mimeType(filename) else declared,
+      byteSize: content.length,
+      checksum: Digest.sha256(content).hex
+    }
+    return Metro.Storage.Service.store(blob.key, content, blob.contentType).map { |_| blob }
+  end
+
+  # Answers with a stored file. Only what a browser cannot be made to run
+  # is shown in the page — pictures, plain text, PDF — and anything else is
+  # a download; nothing is ever sniffed for another type, and a page that
+  # opens one runs no script.
+  served : WebRequest -> Blob -> WebRequest
+  foul served(request, blob) do
+    match Metro.Storage.Service.fetch(blob.key) do
+      Error(_) => return request.plain(404, "Not Found")
+      Ok(content) => do
+        let shown = INLINE.contains?(blob.contentType)
+        let typed = blob.contentType == "text/plain" then "text/plain; charset=utf-8" else (shown then blob.contentType else "application/octet-stream")
+        let disposition = "${shown then "inline" else "attachment"}; filename*=UTF-8''${escaped(blob.filename)}"
+        return request
+          .withHeader("Content-Disposition", disposition)
+          .withHeader("X-Content-Type-Options", "nosniff")
+          .withHeader("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+          .withHeader("Cache-Control", "private, max-age=3600")
+          .bytes(200, content, typed)
+      end
+    end
+  end
+
+  # A percent-encoded text as it was; "" when it is not one.
+  unescaped : String -> String
+  let unescaped(text) = URI.Form.parse("n=${text.replace("+", "%2B")}").map { |form| form.entries }.or([]).first.map { |entry| match entry do (_, value) => value.or("") end }.or("")
+
+  # A text percent-encoded, a space as %20.
+  escaped : String -> String
+  let escaped(text) = URI.Form.from([("n", text)]).encode.drop(2).replace("+", "%20")
+
+  # The types shown in the page rather than downloaded. SVG is not among
+  # them: it can carry script.
+  let INLINE = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "text/plain", "application/pdf"]
+
+  # Whether a type is a picture a page can show.
+  picture? : String -> Bool
+  let picture?(contentType) = INLINE.contains?(contentType) && contentType.startsWith?("image/")
+end

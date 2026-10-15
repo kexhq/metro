@@ -100,6 +100,9 @@ make WebRequest do
   # The body as text; "" when it is not text.
   let requestBody -> String = Metro.Wire.textOf(@incoming)
 
+  # The body as it came: an upload's bytes.
+  let requestBytes -> Binary = Metro.Wire.bytesOf(@incoming)
+
   # --- What plugs leave for the action ----------------------------------------
 
   let assign(key: Atom, value: Any) -> WebRequest = WebRequest { ...this, assigns: @assigns.put(key, value) }
