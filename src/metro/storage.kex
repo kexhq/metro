@@ -50,6 +50,14 @@ module Metro.Storage do
   folder : Disk
   foul folder = Disk { root: ENV.get("METRO_STORAGE_ROOT").or("storage") }
 
+  # Whether a file was written, as `FS.File.writeBytes` answers it: `true`
+  # on Kex 0.4.0-rc.1, `Ok(())` after it. (Clauses, not `==`: comparing the
+  # answer as `Any` is wrong on one or the other.) Gone once rc.1 is.
+  written? : Any -> Bool
+  let written?(true) = true
+  let written?(Ok(_)) = true
+  let written?(other) = false
+
   # The largest upload taken. Net.HTTP's server refuses a body over 10 MiB
   # before Metro sees it (kexhq/kex#488).
   let LARGEST = 10.mebibyte
@@ -81,7 +89,8 @@ module Metro.Storage do
       FS.Directory.create(@root) if !FS.Directory.exists?(@root)
       FS.Directory.create(folder) if !FS.Directory.exists?(folder)
       let path = "${folder}/${key}"
-      return FS.File.writeBytes(path, content) then Ok(()) else Error("could not write ${path}")
+      let answer : Any = FS.File.writeBytes(path, content)
+      return Metro.Storage.written?(answer) then Ok(()) else Error("could not write ${path}")
     end
 
     foul fetch(key: String) -> Result<Binary, String> do

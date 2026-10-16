@@ -27,14 +27,14 @@ end
 # The user registered under an email, with their stored password line.
 foul credentials(email: String) -> Result<(User, String)?, String> do
   return Database.select().from(DB.Schema.Users)
-    .where(DB.Schema.Users.email.eq(email))
+    .where(DB.Schema.Users.email == email)
     .first
     .map { |row| row.map { |found| (decoded(found), found.get("password_hash").or("")) } }
 end
 
 foul member(id: String) -> Result<User?, String> do
   return Database.select().from(DB.Schema.Users)
-    .where(DB.Schema.Users.id.eq(id))
+    .where(DB.Schema.Users.id == id)
     .first
     .map { |row| row.map { |found| decoded(found) } }
 end
