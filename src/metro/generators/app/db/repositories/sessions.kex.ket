@@ -25,24 +25,13 @@ end
 
 # Whose session a digest is, and when it expires (seconds since 1970).
 foul holder(tokenDigest: String) -> Result<(String, Integer)?, String> do
-  return Database.select().from(DB.Schema.Sessions)
-    .where(DB.Schema.Sessions.tokenDigest == tokenDigest)
-    .first
-    .map { |row| row.map { |found| held(found) } }
+  return Database.findBy(DB.Schema.Sessions, {token_digest: tokenDigest})
+    .map { |row| row.map { |found| (found.get("user_id").or(""), found.get("expires_at").or("").trim.to(Integer).or(0)) } }
 end
 
 foul revoke(tokenDigest: String) -> Result<Bool, String> do
   return Database.delete(DB.Schema.Sessions)
-    .where(DB.Schema.Sessions.tokenDigest == tokenDigest)
+    .by({token_digest: tokenDigest})
     .run
     .map { |count| count > 0 }
-end
-
-private do
-  # A session row as whose it is and when it expires.
-  held : {String: String} -> (String, Integer)
-  let held(row) = (
-    row.get("user_id").or(""),
-    row.get("expires_at").or("").trim.to(Integer).or(0)
-  )
 end

@@ -4,16 +4,16 @@
 #   Metro.Storage.received(request)       an upload's bytes, stored: a Blob
 #   Metro.Storage.served(request, blob)   a stored file, answered safely
 #
-# Where files go is a capability, `Metro.Storage.Service`. Outside any
+# Where files go is a capability, `Metro.Storage`. Outside any
 # `with` it is a folder — `storage`, or METRO_STORAGE_ROOT — and an
 # application installs another service the way it installs a database:
 #
-#   with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/slick/files" } do
+#   with Metro.Storage = Metro.Storage.Disk { root: "/var/lib/slick/files" } do
 #     site.start(host, port)
 #   end
 #
 # A service is anything that keeps bytes under a key and gives them back:
-# `make S3, implement: Metro.Storage.Service do … end` is another provider. What a
+# `make S3, implement: Metro.Storage do … end` is another provider. What a
 # file is called and who may see it is the application's to keep, with the
 # Blob `received` gives it; the service only ever sees keys.
 #
@@ -22,22 +22,22 @@
 # live script's `data-live-drop` sends, and nothing to parse.
 capability Metro.Storage.Service do
   # Keeps `content` under `key`, replacing what was there.
-  foul store(
+  foul put(
     key: String,
     content: Binary,
     contentType: String
   ) -> Result<Void, String> do
-    return Metro.Storage.folder().store(key, content, contentType)
+    return Metro.Storage.folder().put(key, content, contentType)
   end
 
   # What is kept under `key`.
-  foul fetch(key: String) -> Result<Binary, String> do
-    return Metro.Storage.folder().fetch(key)
+  foul get(key: String) -> Result<Binary, String> do
+    return Metro.Storage.folder().get(key)
   end
 
   # Forgets what is kept under `key`; nothing kept there is no error.
-  foul discard(key: String) -> Result<Void, String> do
-    return Metro.Storage.folder().discard(key)
+  foul delete(key: String) -> Result<Void, String> do
+    return Metro.Storage.folder().delete(key)
   end
 end
 
@@ -49,14 +49,6 @@ module Metro.Storage do
   # or METRO_STORAGE_ROOT.
   folder : Disk
   foul folder = Disk { root: ENV.get("METRO_STORAGE_ROOT").or("storage") }
-
-  # Whether a file was written, as `FS.File.writeBytes` answers it: `true`
-  # on Kex 0.4.0-rc.1, `Ok(())` after it. (Clauses, not `==`: comparing the
-  # answer as `Any` is wrong on one or the other.) Gone once rc.1 is.
-  written? : Any -> Bool
-  let written?(true) = true
-  let written?(Ok(_)) = true
-  let written?(other) = false
 
   # The largest upload taken. Net.HTTP's server refuses a body over 10 MiB
   # before Metro sees it (kexhq/kex#488).
@@ -79,7 +71,7 @@ module Metro.Storage do
   end
 
   make Disk, implement: Metro.Storage.Service do
-    foul store(
+    foul put(
       key: String,
       content: Binary,
       contentType: String
@@ -89,11 +81,10 @@ module Metro.Storage do
       FS.Directory.create(@root) if !FS.Directory.exists?(@root)
       FS.Directory.create(folder) if !FS.Directory.exists?(folder)
       let path = "${folder}/${key}"
-      let answer : Any = FS.File.writeBytes(path, content)
-      return Metro.Storage.written?(answer) then Ok(()) else Error("could not write ${path}")
+      return FS.File.writeBytes(path, content).ok? then Ok(()) else Error("could not write ${path}")
     end
 
-    foul fetch(key: String) -> Result<Binary, String> do
+    foul get(key: String) -> Result<Binary, String> do
       return Error("not a key: ${key}") if !Metro.Storage.key?(key)
       match FS.File.readBytes("${@root}/${key.take(2)}/${key}") do
         Ok(content) => return Ok(content)
@@ -101,7 +92,7 @@ module Metro.Storage do
       end
     end
 
-    foul discard(key: String) -> Result<Void, String> do
+    foul delete(key: String) -> Result<Void, String> do
       return Error("not a key: ${key}") if !Metro.Storage.key?(key)
       let path = "${@root}/${key.take(2)}/${key}"
       FS.File.delete(path) if FS.File.exists?(path)
@@ -142,7 +133,7 @@ module Metro.Storage do
       byteSize: content.length,
       checksum: Digest.sha256(content).hex
     }
-    return Metro.Storage.Service.store(blob.key, content, blob.contentType)
+    return Metro.Storage.Service.put(blob.key, content, blob.contentType)
       .map { |_| blob }
   end
 
@@ -152,7 +143,7 @@ module Metro.Storage do
   # opens one runs no script.
   served : WebRequest -> Blob -> WebRequest
   foul served(request, blob) do
-    match Metro.Storage.Service.fetch(blob.key) do
+    match Metro.Storage.Service.get(blob.key) do
       Error(_) => return request.plain(404, "Not Found")
       Ok(content) => do
         let shown = INLINE.contains?(blob.contentType)

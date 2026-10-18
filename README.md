@@ -311,7 +311,7 @@ with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/app/files" } d
 end
 ```
 
-Another provider is a record that implements `store`, `fetch` and `discard`
+Another provider is a record that implements `put`, `get` and `delete`
 by key: `make S3, implement: Metro.Storage.Service do … end`. Metro has only the
 folder for now: S3 needs HMAC-SHA256 in Kex (kexhq/kex#459).
 

@@ -1,0 +1,10 @@
+# One line of the sidebar: a channel, a group chat or a team.
+client module App.UI.Entry
+
+record Entry do
+  caption : String
+  current? : Bool = false
+  locked? : Bool = false
+  unread : Int = 0
+  onClick : Metro.Event? = None
+end

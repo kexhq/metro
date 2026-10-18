@@ -59,6 +59,12 @@ serving Store do
   foul slot asked(statement: Statement) -> Reply<Result<[[String]], String>> do
     return { reply: Harmat.Odbc.query(@connection, statement) }
   end
+
+  # Runs `work` as one transaction, here, on this process's connection:
+  # nothing another process asks for is run until it is over.
+  foul slot transacted(work: Block<Result<Any, String>>) -> Reply<Result<Any, String>> do
+    return { reply: Harmat.Database.Direct { connection: @connection }.transaction(work) }
+  end
 end
 
 # A running store, connected. Migrating is a separate step: see `migrate`.
@@ -79,13 +85,27 @@ record StoreConnection do
   store : Server<Store>
 end
 
+# Inside a transaction a statement is already in the store's own process
+# (`transacted`), on the connection the transaction is open on: it runs
+# there, without asking the store — which is busy running the transaction.
 make StoreConnection, implement: Harmat.Connection do
   foul run(statement: Harmat.Odbc.Statement) -> Result<Integer, String> do
-    return flat(@store.ran(statement))
+    match Harmat.Database.ongoing() do
+      Just(connection) => return Harmat.Odbc.executing(connection, statement)
+      None => return flat(@store.ran(statement))
+    end
   end
 
   foul ask(statement: Harmat.Odbc.Statement) -> Result<[[String]], String> do
-    return flat(@store.asked(statement))
+    match Harmat.Database.ongoing() do
+      Just(connection) => return Harmat.Odbc.querying(connection, statement)
+      None => return flat(@store.asked(statement))
+    end
+  end
+
+  foul transaction(work: Block<Result<Any, String>>) -> Result<Any, String> do
+    return work() if Harmat.Database.ongoing().set?
+    return flat(@store.transacted(work, within: 30_000))
   end
 end
 

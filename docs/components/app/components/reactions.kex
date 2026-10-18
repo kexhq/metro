@@ -1,0 +1,64 @@
+# The reactions under one message, and the button to add one.
+#
+# Clicking shows the change at once and asks the server after: in the
+# browser nobody waits for a round trip to see their own 🎉. When the
+# server says no, the count goes back to what it said.
+client module App.Components.Reactions
+
+using App.Actions, only: [Actions]
+using App.Components.EmojiPicker, only: [EmojiPicker]
+
+type Event = Toggled(String)
+           | Picking
+           | Picked(String)
+           | Closed
+           | Refused(String)
+
+record Tally do
+  emoji : String
+  count : Int
+  mine? : Bool
+end
+
+record Reactions do
+  # Given by the conversation, from what is stored.
+  message : String
+  tallies : [Tally] = []
+
+  picking? : Bool = false
+end
+
+serving Reactions do
+  foul slot on(Toggled(emoji)) -> Void do
+    Metro.ask({ Actions.current.react(@message, emoji) }, { |answer|
+      answer.flatten.err.map { |_| Refused(emoji) }
+    })
+    return New { tallies: toggled(@tallies, emoji) }
+  end
+
+  slot on(Picking) -> Void = New { picking?: true }
+
+  foul slot on(Picked(emoji)) -> Void do
+    Metro.send(this, Toggled(emoji))
+    return New { picking?: false }
+  end
+
+  slot on(Closed) -> Void = New { picking?: false }
+
+  # Undoes what `Toggled` showed.
+  slot on(Refused(emoji)) -> Void = New { tallies: toggled(@tallies, emoji) }
+end
+
+# The tallies with this person's reaction added, or taken back.
+toggled : [Tally] -> String -> [Tally]
+let toggled(tallies, emoji) do
+  match tallies.find { |tally| tally.emoji == emoji } do
+    None => tallies.push(Tally { emoji: emoji, count: 1, mine?: true })
+    Just(tally) => do
+      let count = tally.mine? then tally.count - 1 else tally.count + 1
+      let changed = Tally { ...tally, count: count, mine?: !tally.mine? }
+      tallies.map { |each| each.emoji == emoji then changed else each }
+        .reject { |each| each.count == 0 }
+    end
+  end
+end

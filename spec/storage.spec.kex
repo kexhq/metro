@@ -14,7 +14,7 @@ describe("Metro.Storage") do
       Assert.equal(blob.contentType, "image/png")
       Assert.equal(blob.byteSize, 7)
       Assert.equal(blob.checksum, Digest.sha256("PNGDATA"))
-      let kept = Metro.Storage.Service.fetch(blob.key)
+      let kept = Metro.Storage.Service.get(blob.key)
         .map { |content| content.to(String).or("") }
       Assert.equal(kept, Ok("PNGDATA"))
 
@@ -32,10 +32,10 @@ describe("Metro.Storage") do
       # Nothing for an empty body, nor a key that is a path.
       let empty = Metro.Wire.made("POST", "/uploads", [], "")
       Assert.truthy(Metro.Storage.received(Metro.WebRequest.WebRequest { incoming: empty }).error?)
-      Assert.truthy(Metro.Storage.Service.fetch("../etc/passwd").error?)
+      Assert.truthy(Metro.Storage.Service.get("../etc/passwd").error?)
 
-      Metro.Storage.Service.discard(blob.key).try
-      Assert.truthy(Metro.Storage.Service.fetch(blob.key).error?)
+      Metro.Storage.Service.delete(blob.key).try
+      Assert.truthy(Metro.Storage.Service.get(blob.key).error?)
     end
     FS.Directory.deleteAll(root)
   end

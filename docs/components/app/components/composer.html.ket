@@ -1,0 +1,23 @@
+<form class="composer" on:submit="<%= Sent %>">
+  <% if !@suggestions.empty? %>
+    <ul class="suggestions" role="listbox">
+      <% @suggestions.eachIndexed do |mention, index| %>
+        <li key="<%= mention.handle %>" role="option" aria-selected="<%= index == @highlighted %>"
+            on:click="<%= Took %>">
+          <strong>@<%= mention.handle %></strong> <span class="hint"><%= mention.caption %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+  <textarea name="body" rows="1" placeholder="<%= @placeholder %>" value="<%= @body %>"
+            on:input="<%= Typed %>"
+            on:key.enter="<%= @suggestions.empty? then Sent else Took %>"
+            on:key.tab="<%= @suggestions.empty? then None else Just(Took) %>"
+            on:key.down="<%= Moved(1) %>"
+            on:key.up="<%= Moved(-1) %>"
+            on:key.escape="<%= Dismissed %>"></textarea>
+  <% if !@problem.empty? %>
+    <p class="problem" role="alert"><%= @problem %></p>
+  <% end %>
+  <Button kind="primary" disabled="<%= @sending? || @body.trim.empty? %>">Send</Button>
+</form>

@@ -1,0 +1,73 @@
+# Everything a tab may ask of the server that changes what is stored.
+#
+# One `Actions` runs per tab, started by Metro from the session: `@user`
+# is who signed in, never something a browser said. So every permission
+# check is here. A client component's state and events belong to the
+# person using it once it runs in their browser; these slots do not.
+#
+# A component calls them the same way wherever it runs:
+#
+#   Actions.current.react(message.id, "🎉")
+#
+# On the server that is a call to this process. In the browser it is
+# the same call, carried over the tab's socket, and the component waits
+# for the reply the same way.
+module App.Actions
+
+using App.Models.Conversation, only: [Conversation, Access]
+using App.Models.Message, only: [Message]
+using App.Models.User, only: [User]
+using DB.Repositories.Conversations, as: Conversations
+using DB.Repositories.Drafts, as: Drafts
+using DB.Repositories.Messages, as: Messages
+using DB.Repositories.Reactions, as: Reactions
+
+record Actions do
+  user : User
+end
+
+# This tab's actions.
+foul current : Server<Actions>
+let current = Metro.actions(Actions)
+
+serving Actions do
+  slot createChannel(title: String, access: Access, team: String) -> Reply<Result<Conversation, String>> do
+    let created = App.Rules.channelName(title).then { |name|
+      Conversations.open(@user, name, access, team)
+    }
+    created.each { |channel| Metro.publish("organization:${channel.organizationId}") }
+    return { reply: created }
+  end
+
+  slot send(conversation: String, body: String) -> Reply<Result<Message, String>> do
+    let sent = readable(conversation).then { |open|
+      App.Rules.messageBody(body).then { |text| Messages.post(open, @user, text) }
+    }
+    sent.each { |message|
+      Drafts.discard(@user.id, conversation)
+      Metro.publish("conversation:${conversation}")
+    }
+    return { reply: sent }
+  end
+
+  # Adds the reaction, or takes it back when it is already this
+  # person's.
+  slot react(message: String, emoji: String) -> Reply<Result<Void, String>> do
+    let done = Messages.find(message).then { |found|
+      readable(found.conversationId).then { |_| Reactions.toggle(found, @user, emoji) }
+    }
+    done.each { |found| Metro.publish("conversation:${found.conversationId}") }
+    return { reply: done.map { |_| Void } }
+  end
+
+  # A cast: nothing waits for a draft to be kept.
+  slot keepDraft(conversation: String, body: String) -> Void do
+    readable(conversation).each { |_| Drafts.keep(@user.id, conversation, body) }
+    return new
+  end
+
+  # The conversation, when this person may read it. An id is not a
+  # permission.
+  let readable(id: String) -> Result<Conversation, String> =
+    Conversations.visible(id, @user).okOr("That conversation isn't there.")
+end

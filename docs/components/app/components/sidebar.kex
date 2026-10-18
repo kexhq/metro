@@ -1,0 +1,31 @@
+# The channels, group chats and teams down the side.
+#
+# A server component: not a client module, so it may read what is
+# stored, and its template does, through the functions below. It has no
+# state and no events — choosing a channel is the page's `Opened`,
+# passed down.
+module App.Components.Sidebar
+
+using App.Models.Organization, only: [Organization]
+using App.Models.User, only: [User]
+using DB.Repositories.Conversations, as: Conversations
+using DB.Repositories.Teams, as: Teams
+using App.UI.Button, only: [Button]
+using App.UI.Entry, only: [Entry]
+
+record Sidebar do
+  organization : Organization
+  user : User
+  current : String = ""
+  onOpened : String -> Metro.Event
+  onNewChannel : Metro.Event
+end
+
+make Sidebar do
+  # What it is rendered again for: `Metro.publish` of any of these.
+  let listens -> [String] = ["organization:${@organization.id}"]
+
+  foul let channels = Conversations.readable(@organization.id, @user).or([])
+  foul let groups = Conversations.groupsOf(@organization.id, @user.id).or([])
+  foul let teams = Teams.ofOrganization(@organization.id).or([])
+end

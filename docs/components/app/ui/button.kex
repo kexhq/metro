@@ -1,0 +1,17 @@
+# A button. Stateless: a record and its markup, nothing else. Its
+# template is button.html.ket, beside this file, found by name.
+#
+# `<Button kind="primary" onClick="<%= Saved %>">Save</Button>` in any
+# template builds `Button { kind: "primary", onClick: Just(Saved),
+# children: … }`: a tag is a record literal, its attributes the fields,
+# what is inside it the `children`.
+client module App.UI.Button
+
+record Button do
+  kind : String = "secondary"
+  # "submit" inside a form, so Enter sends it.
+  type : String = "submit"
+  disabled : Bool = false
+  onClick : Metro.Event? = None
+  children : Metro.View
+end

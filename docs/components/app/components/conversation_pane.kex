@@ -1,0 +1,41 @@
+# One open conversation: its messages, their reactions, and the box to
+# write in.
+#
+# A server component around client ones. It reads the messages, and
+# hands each message's reactions to a `<Reactions>` and the draft to the
+# `<Composer>`: those hold state and events, and may later run in the
+# browser, while what is stored stays read here. When a message arrives,
+# this re-renders; the `<Composer>` keeps what is being typed in it,
+# because its own fields are its own.
+module App.Components.ConversationPane
+
+using App.Components.Composer, only: [Composer, Mention]
+using App.Components.Reactions, only: [Reactions, Tally]
+using App.Models.Conversation, only: [Conversation]
+using App.Models.User, only: [User]
+using DB.Repositories.Drafts, as: Drafts
+using DB.Repositories.Messages, as: Messages
+using DB.Repositories.Reactions, as: ReactionsTable
+using DB.Repositories.Users, as: Users
+
+# How many of the latest messages are shown.
+let WINDOW = 200
+
+record ConversationPane do
+  open : Conversation
+  user : User
+end
+
+make ConversationPane do
+  # What it is rendered again for: `Metro.publish` of any of these.
+  let listens -> [String] = ["conversation:${@open.id}"]
+
+  foul let messages = Messages.latest(@open.id, WINDOW).or([])
+
+  foul let tallies(message: String) -> [Tally] =
+    ReactionsTable.counted(message, @user.id).or([])
+
+  foul let draft = Drafts.of(@user.id, @open.id).map { |kept| kept.body }.or("")
+
+  foul let mentionable -> [Mention] = Users.mentionable(@open.organizationId).or([])
+end

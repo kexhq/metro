@@ -1,0 +1,35 @@
+<Dialog heading="New channel" lead="Channels are where a topic or a project is talked about." onClose="<%= Cancelled %>">
+  <form class="details-form" on:submit="<%= Submitted %>">
+    <Field label="Name">
+      <input name="title" value="<%= @title %>" placeholder="new-channel" maxlength="30" autocomplete="off" autofocus on:input="<%= Named %>">
+    </Field>
+    <fieldset class="access">
+      <legend>Who can read it</legend>
+      <label class="choice">
+        <input type="radio" name="access" checked="<%= @access == Public %>" on:change="<%= Chose(Public) %>">
+        Everyone in the organization
+      </label>
+      <label class="choice">
+        <input type="radio" name="access" checked="<%= @access == Private %>" on:change="<%= Chose(Private) %>">
+        🔒 Only the people in it
+      </label>
+    </fieldset>
+    <% if !@teams.empty? %>
+      <Field label="Team" hint="A team's members can always read its private channels.">
+        <select name="team" on:change="<%= Teamed %>">
+          <option value="" selected="<%= @chosen.empty? %>">No team</option>
+          <% @teams.each do |team| %>
+            <option key="<%= team.id %>" value="<%= team.id %>" selected="<%= team.id == @chosen %>">@<%= team.handle %></option>
+          <% end %>
+        </select>
+      </Field>
+    <% end %>
+    <% if !@problem.empty? %>
+      <p class="problem" role="alert"><%= @problem %></p>
+    <% end %>
+    <div class="actions">
+      <Button kind="primary" disabled="<%= @waiting? %>">Create channel</Button>
+      <Button type="button" kind="quiet" onClick="<%= Cancelled %>">Cancel</Button>
+    </div>
+  </form>
+</Dialog>

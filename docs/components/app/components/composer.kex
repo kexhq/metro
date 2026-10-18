@@ -1,0 +1,118 @@
+# The message box: what is being written, the `@` suggestions while it
+# is, and sending it.
+#
+# Today this is two halves — markup the live view renders, and a
+# `Composer` hook in public/app.js for the suggestions, which has to
+# read the people from JSON in a `data-` attribute. As a component it is
+# one thing, in Kex, and the suggestions are its own state.
+client module App.Components.Composer
+
+using App.Actions, only: [Actions]
+using App.Models.Message, only: [Message]
+using App.UI.Button, only: [Button]
+
+type Event = Typed(String)
+           | Moved(Int)
+           | Took
+           | Dismissed
+           | Sent
+           | Answered(Result<Result<Message, String>, CallError>)
+           | Settled(Int)
+
+# Somebody, or a team, that can be mentioned.
+record Mention do
+  handle : String
+  caption : String
+  kind : String
+end
+
+record Composer do
+  # Given by the conversation.
+  conversation : String
+  mentionable : [Mention] = []
+  placeholder : String = "Write a message"
+  # What was left unsent here last time: where the box starts.
+  draft : String = ""
+
+  body : String = ""
+  suggestions : [Mention] = []
+  highlighted : Int = 0
+  problem : String = ""
+  sending? : Bool = false
+  # Counted up by every keystroke, so only the last one's `Settled`
+  # keeps the draft.
+  edits : Int = 0
+end
+
+# How long typing has to pause before the draft is kept.
+let SETTLES_AFTER = 800
+
+serving Composer do
+  slot mounted -> Void = New { body: @draft }
+
+  foul slot on(Typed(text)) -> Void do
+    Metro.later(SETTLES_AFTER, Settled(@edits + 1))
+    return New {
+      body: text,
+      suggestions: suggested(@mentionable, text),
+      highlighted: 0,
+      problem: "",
+      edits: @edits + 1
+    }
+  end
+
+  slot on(Moved(by)) -> Void = New {
+    highlighted: (@highlighted + by).clamp(0, @suggestions.count - 1)
+  }
+
+  slot on(Took) -> Void do
+    match @suggestions.at(@highlighted) do
+      Just(mention) => New { body: completed(@body, mention), suggestions: [] }
+      None => New { suggestions: [] }
+    end
+  end
+
+  slot on(Dismissed) -> Void = New { suggestions: [] }
+
+  foul slot on(Settled(edit)) -> Void do
+    if edit == @edits
+      Actions.current.keepDraft(@conversation, @body)
+    end
+    return new
+  end
+
+  foul slot on(Sent) -> Void do
+    match App.Rules.messageBody(@body) do
+      Error(problem) => return New { problem: problem }
+      Ok(text) => do
+        Metro.ask({ Actions.current.send(@conversation, text) }, Answered)
+        return New { sending?: true }
+      end
+    end
+  end
+
+  slot on(Answered(Ok(Ok(_)))) -> Void = New { body: "", sending?: false }
+  slot on(Answered(Ok(Error(problem)))) -> Void = New { problem: problem, sending?: false }
+  slot on(Answered(Error(_))) -> Void = New {
+    problem: "Not sent: Slick can't be reached. It's still here to send again.",
+    sending?: false
+  }
+end
+
+# Who a word being typed after `@` could mean, best first.
+suggested : [Mention] -> String -> [Mention]
+let suggested(mentionable, text) do
+  let word = text.split(" ").last.or("")
+  if !word.startsWith?("@") || word.count < 2
+    return []
+  end
+  let typed = word.drop(1).lowerCase
+  return mentionable.filter { |mention| mention.handle.startsWith?(typed) }.take(6)
+end
+
+# The text with its last word replaced by the mention.
+completed : String -> Mention -> String
+let completed(text, mention) do
+  let words = text.split(" ")
+  return words.take(words.count - 1).push("@${mention.handle} ").join(" ")
+end

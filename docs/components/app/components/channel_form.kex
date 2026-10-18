@@ -1,0 +1,85 @@
+# The dialog for starting a channel.
+#
+# A client component: its state is this record, what can happen to it is
+# `Event`, and it never touches the database — creating the channel is
+# `Actions.createChannel`, answered by the server. So it runs as a live
+# component on the server today, and in the browser once Kex compiles
+# to JavaScript, without a line here changing.
+#
+# Its markup is channel_form.html.ket, beside this file.
+client module App.Components.ChannelForm
+
+using App.Actions, only: [Actions]
+using App.Models.Conversation, only: [Conversation, Access, Public, Private]
+using App.Models.Team, only: [Team]
+using App.UI.Button, only: [Button]
+using App.UI.Dialog, only: [Dialog]
+using App.UI.Field, only: [Field]
+
+type Event = Named(String)
+           | Chose(Access)
+           | Teamed(String)
+           | Submitted
+           | Answered(Result<Result<Conversation, String>, CallError>)
+           | Cancelled
+
+record ChannelForm do
+  # Given by the parent, and given again each time it renders.
+  teams : [Team] = []
+  team : String = ""
+  closed? : Bool = false
+  onCreated : String -> Metro.Event
+  onClosed : Metro.Event
+
+  # Its own, kept from one render to the next.
+  title : String = ""
+  access : Access = Public
+  chosen : String = ""
+  problem : String = ""
+  waiting? : Bool = false
+end
+
+serving ChannelForm do
+  # Opened from a team, it starts as that team's; asked for a private
+  # channel, with "Only the people in it" ticked.
+  slot mounted -> Void = New {
+    access: @closed? then Private else Public,
+    chosen: @team
+  }
+
+  # Says what is wrong while somebody types, with the same rule the
+  # server checks again.
+  slot on(Named(text)) -> Void = New {
+    title: text,
+    problem: App.Rules.channelName(text).err.or("")
+  }
+
+  slot on(Chose(access)) -> Void = New { access: access }
+
+  slot on(Teamed(id)) -> Void = New { chosen: id }
+
+  foul slot on(Cancelled) -> Void do
+    Metro.emit(@onClosed)
+    return new
+  end
+
+  # Asking is not waiting: `Metro.ask` makes the call beside the
+  # component and hands back its reply as `Answered`, so the button
+  # shows it is busy in the meantime.
+  foul slot on(Submitted) -> Void do
+    Metro.ask({ Actions.current.createChannel(@title, @access, @chosen) }, Answered)
+    return New { waiting?: true, problem: "" }
+  end
+
+  foul slot on(Answered(Ok(Ok(channel)))) -> Void do
+    Metro.emit(@onCreated(channel.id))
+    return New { waiting?: false }
+  end
+
+  slot on(Answered(Ok(Error(problem)))) -> Void = New { waiting?: false, problem: problem }
+
+  slot on(Answered(Error(_))) -> Void = New {
+    waiting?: false,
+    problem: "Slick can't be reached. Try again in a moment."
+  }
+end

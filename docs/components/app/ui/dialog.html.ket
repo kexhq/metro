@@ -1,0 +1,9 @@
+<div class="backdrop" on:click.self="<%= @onClose %>" on:key.escape="<%= @onClose %>">
+  <section class="dialog" role="dialog" aria-modal="true" aria-label="<%= @heading %>">
+    <h2><%= @heading %></h2>
+    <% if !@lead.empty? %>
+      <p class="hint"><%= @lead %></p>
+    <% end %>
+    <%= @children %>
+  </section>
+</div>

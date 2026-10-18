@@ -1,0 +1,14 @@
+<div class="reactions">
+  <% @tallies.each do |tally| %>
+    <button type="button" key="<%= tally.emoji %>"
+            class="reaction <%= tally.mine? then "mine" else "" %>"
+            aria-pressed="<%= tally.mine? %>"
+            on:click="<%= Toggled(tally.emoji) %>">
+      <%= tally.emoji %> <%= tally.count %>
+    </button>
+  <% end %>
+  <button type="button" class="reaction add" title="Add a reaction" on:click="<%= Picking %>">☺︎</button>
+  <% if @picking? %>
+    <EmojiPicker onPicked="<%= Picked %>" onClosed="<%= Closed %>" />
+  <% end %>
+</div>

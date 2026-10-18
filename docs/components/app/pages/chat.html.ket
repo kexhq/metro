@@ -1,0 +1,15 @@
+<% if home == None %>
+  <p class="notice">You aren't in that organization.</p>
+<% end %>
+<% home.each do |organization| %>
+  <div class="workspace" title="<%= open.map { |conversation| conversation.title }.or(organization.name) %>">
+    <Sidebar organization="<%= organization %>" user="<%= @user %>" current="<%= @conversation %>"
+             onOpened="<%= Opened %>" onNewChannel="<%= Asked(NewChannel) %>" />
+    <% open.each do |conversation| %>
+      <ConversationPane key="<%= conversation.id %>" open="<%= conversation %>" user="<%= @user %>" />
+    <% end %>
+  </div>
+  <% if @dialog == NewChannel %>
+    <ChannelForm onCreated="<%= Opened %>" onClosed="<%= Closed %>" />
+  <% end %>
+<% end %>

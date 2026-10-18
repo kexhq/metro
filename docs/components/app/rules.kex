@@ -1,0 +1,34 @@
+# What makes a name or a message acceptable. A client module, so the
+# same rules run twice: in a component, to say what is wrong while
+# somebody types, and in an action, where they are the ones that count.
+client module App.Rules
+
+let LONGEST_CHANNEL = 30
+let LONGEST_MESSAGE = 4000
+
+channelName : String -> Result<String, String>
+let channelName(title) do
+  let name = title.trim.lowerCase
+  if name.count < 2
+    return Error("A channel name needs at least 2 characters.")
+  end
+  if name.count > LONGEST_CHANNEL
+    return Error("A channel name has at most ${LONGEST_CHANNEL} characters.")
+  end
+  if !name.chars.all? { |char| char.lower? || char.digit? || char == '-' }
+    return Error("A channel name may only have lower-case letters, digits and dashes.")
+  end
+  return Ok(name)
+end
+
+messageBody : String -> Result<String, String>
+let messageBody(body) do
+  let text = body.trim
+  if text.empty?
+    return Error("A message can't be empty.")
+  end
+  if text.count > LONGEST_MESSAGE
+    return Error("A message has at most ${LONGEST_MESSAGE} characters.")
+  end
+  return Ok(text)
+end

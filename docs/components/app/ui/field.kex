@@ -1,0 +1,9 @@
+# A labelled form field: the label, the control inside it, and an
+# optional hint under it.
+client module App.UI.Field
+
+record Field do
+  label : String
+  hint : String = ""
+  children : Metro.View
+end

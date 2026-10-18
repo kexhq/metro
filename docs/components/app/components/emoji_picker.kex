@@ -1,0 +1,42 @@
+# Picking an emoji, by searching its name. It asks the server for
+# nothing, so once Kex compiles to JavaScript it never needs the socket:
+# searching costs no round trip at all.
+client module App.Components.EmojiPicker
+
+using App.Models.Emoji, only: [Emoji]
+
+type Event = Searched(String)
+           | Moved(Int)
+           | Chosen(String)
+           | Dismissed
+
+record EmojiPicker do
+  onPicked : String -> Metro.Event
+  onClosed : Metro.Event
+
+  query : String = ""
+  highlighted : Int = 0
+end
+
+serving EmojiPicker do
+  slot on(Searched(text)) -> Void = New { query: text, highlighted: 0 }
+
+  slot on(Moved(by)) -> Void = New {
+    highlighted: (@highlighted + by).clamp(0, found.count - 1)
+  }
+
+  foul slot on(Chosen(glyph)) -> Void do
+    Metro.emit(@onPicked(glyph))
+    return new
+  end
+
+  foul slot on(Dismissed) -> Void do
+    Metro.emit(@onClosed)
+    return new
+  end
+
+  # The emoji whose name has what was typed, at most 48 of them.
+  let found -> [Emoji] = App.Models.Emoji.all
+    .filter { |emoji| emoji.name.contains?(@query.lowerCase) }
+    .take(48)
+end

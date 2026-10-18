@@ -1,0 +1,59 @@
+# The page: which conversation is open, and which dialog.
+#
+# A server component with state. It stays on the server — it is not a
+# client module, and reads the organization — but it has events like any
+# other component. Compare Slick's `App.Live.Tab` and `handled` today:
+# every dialog's fields and every event of the app in one record and one
+# `match`. Here the page only knows where the tab is; each dialog keeps
+# its own fields.
+#
+# Mounted by a route, which says where its client components run:
+#
+#   Metro.Router.live("/:organization/:conversation", App.Pages.Chat,
+#                     components: Metro.Client)
+#
+# `Metro.Client` falls back to `Metro.Server` until Kex compiles to
+# JavaScript, so the same route works before and after.
+module App.Pages.Chat
+
+using App.Components.ChannelForm, only: [ChannelForm]
+using App.Components.ConversationPane, only: [ConversationPane]
+using App.Components.Sidebar, only: [Sidebar]
+using App.Models.User, only: [User]
+using DB.Repositories.Conversations, as: Conversations
+using DB.Repositories.Organizations, as: Organizations
+
+type Open = Nothing
+          | NewChannel
+
+type Event = Opened(String)
+           | Asked(Open)
+           | Closed
+
+record Chat do
+  # From the route and the session.
+  organization : String
+  conversation : String = ""
+  user : User
+
+  dialog : Open = Nothing
+end
+
+serving Chat do
+  # A new address for the tab; the back button gives `Opened` again.
+  foul slot on(Opened(id)) -> Void do
+    Metro.navigate("/${@organization}/${id}")
+    return New { conversation: id, dialog: Nothing }
+  end
+
+  slot on(Asked(dialog)) -> Void = New { dialog: dialog }
+
+  slot on(Closed) -> Void = New { dialog: Nothing }
+
+  # Somebody may only see an organization they are in, and a
+  # conversation of it they may read.
+  foul let home = Organizations.memberOf(@organization, @user)
+  foul let open = home.then { |organization|
+    Conversations.visibleOr(@conversation, organization, @user)
+  }
+end

@@ -1,0 +1,7 @@
+<label class="field">
+  <span><%= @label %></span>
+  <%= @children %>
+  <% if !@hint.empty? %>
+    <span class="hint"><%= @hint %></span>
+  <% end %>
+</label>

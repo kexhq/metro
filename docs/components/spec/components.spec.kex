@@ -1,0 +1,62 @@
+# A component is its record and its slots, so a spec drives it the way a
+# page does — one event at a time — with no socket, no browser and no
+# database. `Metro.Test.mounted` runs the slots and records what they
+# would ask of the server, emit to the parent or schedule, without doing
+# any of it. Once Kex compiles to JavaScript, the same specs run there
+# too, and have to agree.
+
+using App.Components.ChannelForm, only: [ChannelForm, Named, Submitted, Answered]
+using App.Components.Composer, only: [Composer, Mention, Typed, Took, Settled]
+using App.Components.Reactions, only: [Reactions, Tally, Toggled, Refused]
+using App.Pages.Chat, only: [Opened, Closed]
+
+describe("ChannelForm") do
+  let form = Metro.Test.mounted(ChannelForm { onCreated: Opened, onClosed: Closed })
+
+  it("says what is wrong with a name while it is typed") do
+    let typed = form.sent(Named("Design Team"))
+    Assert.equal(typed.state.problem, "A channel name may only have lower-case letters, digits and dashes.")
+    Assert.truthy(typed.view.contains?("role=\"alert\""))
+  end
+
+  it("asks the server, and shows it is busy until the answer") do
+    let asked = form.sent(Named("design")).sent(Submitted)
+    Assert.equal(asked.asked, ["createChannel(\"design\", Public, \"\")"])
+    Assert.truthy(asked.state.waiting?)
+  end
+
+  it("tells its parent which channel it made") do
+    let channel = App.Models.Conversation.Conversation { id: "c1", title: "design" }
+    let created = form.sent(Submitted).sent(Answered(Ok(Ok(channel))))
+    Assert.equal(created.emitted, [Opened("c1")])
+  end
+end
+
+describe("Composer") do
+  let ada = Mention { handle: "ada", caption: "Ada Lovelace", kind: "person" }
+  let box = Metro.Test.mounted(Composer { conversation: "c1", mentionable: [ada] })
+
+  it("suggests who is meant after an @, and takes the suggestion") do
+    let typed = box.sent(Typed("thanks @a"))
+    Assert.equal(typed.state.suggestions, [ada])
+    Assert.equal(typed.sent(Took).state.body, "thanks @ada ")
+  end
+
+  it("keeps the draft once typing pauses, not for every key") do
+    let typed = box.sent(Typed("h")).sent(Typed("hi"))
+    Assert.equal(typed.scheduled, [(800, Settled(1)), (800, Settled(2))])
+    Assert.equal(typed.sent(Settled(1)).asked, [])
+    Assert.equal(typed.sent(Settled(2)).asked, ["keepDraft(\"c1\", \"hi\")"])
+  end
+end
+
+describe("Reactions") do
+  let party = Tally { emoji: "🎉", count: 2, mine?: false }
+  let under = Metro.Test.mounted(Reactions { message: "m1", tallies: [party] })
+
+  it("shows a reaction at once, and takes it back when the server says no") do
+    let clicked = under.sent(Toggled("🎉"))
+    Assert.equal(clicked.state.tallies, [Tally { ...party, count: 3, mine?: true }])
+    Assert.equal(clicked.sent(Refused("🎉")).state.tallies, [party])
+  end
+end

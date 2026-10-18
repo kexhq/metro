@@ -1,0 +1,14 @@
+<section class="conversation">
+  <ol class="messages" data-scroll="newest">
+    <% messages.each do |message| %>
+      <li key="<%= message.id %>" class="message">
+        <strong><%= message.author %></strong>
+        <time datetime="<%= message.sentAt %>"><%= message.sentAt.shortTime %></time>
+        <%== App.Helpers.RichText.html(message.body) %>
+        <Reactions key="<%= message.id %>" message="<%= message.id %>" tallies="<%= tallies(message.id) %>" />
+      </li>
+    <% end %>
+  </ol>
+  <Composer key="<%= @open.id %>" conversation="<%= @open.id %>" draft="<%= draft %>"
+            mentionable="<%= mentionable %>" placeholder="Message <%= @open.title %>" />
+</section>

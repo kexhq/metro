@@ -1,0 +1,25 @@
+<nav class="sidebar">
+  <div class="sidebar-head">
+    <h2>Channels</h2>
+    <Button type="button" kind="quiet" onClick="<%= @onNewChannel %>">+</Button>
+  </div>
+  <ul class="entries">
+    <% channels.each do |channel| %>
+      <Entry key="<%= channel.id %>" caption="<%= channel.title %>" locked?="<%= !channel.public? %>"
+             current?="<%= channel.id == @current %>" onClick="<%= @onOpened(channel.id) %>" />
+    <% end %>
+  </ul>
+  <div class="sidebar-head"><h2>Group chats</h2></div>
+  <ul class="entries">
+    <% groups.each do |group| %>
+      <Entry key="<%= group.id %>" caption="<%= group.gathering(@user) %>"
+             current?="<%= group.id == @current %>" onClick="<%= @onOpened(group.id) %>" />
+    <% end %>
+  </ul>
+  <div class="sidebar-head"><h2>Teams</h2></div>
+  <ul class="entries">
+    <% teams.each do |team| %>
+      <Entry key="<%= team.id %>" caption="@<%= team.handle %>" />
+    <% end %>
+  </ul>
+</nav>

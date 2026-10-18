@@ -1,0 +1,9 @@
+<li class="entry <%= @current? then "current" else "" %>" aria-current="<%= @current? %>">
+  <button type="button" on:click="<%= @onClick %>">
+    <% if @locked? %>🔒<% end %>
+    <span class="caption"><%= @caption %></span>
+    <% if @unread > 0 %>
+      <span class="unread"><%= @unread %></span>
+    <% end %>
+  </button>
+</li>

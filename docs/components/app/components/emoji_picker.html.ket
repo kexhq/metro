@@ -1,0 +1,14 @@
+<div class="emoji-picker" role="dialog" aria-label="Pick an emoji" on:key.escape="<%= Dismissed %>" on:outside="<%= Dismissed %>">
+  <input type="search" placeholder="Search emoji" value="<%= @query %>" autofocus
+         on:input="<%= Searched %>"
+         on:key.down="<%= Moved(1) %>"
+         on:key.up="<%= Moved(-1) %>"
+         on:key.enter="<%= found.at(@highlighted).map { |emoji| Chosen(emoji.glyph) } %>">
+  <div class="grid">
+    <% found.eachIndexed do |emoji, index| %>
+      <button type="button" key="<%= emoji.name %>" title=":<%= emoji.name %>:"
+              class="<%= index == @highlighted then "highlighted" else "" %>"
+              on:click="<%= Chosen(emoji.glyph) %>"><%= emoji.glyph %></button>
+    <% end %>
+  </div>
+</div>

@@ -12,44 +12,24 @@ using App.Models.User, only: [User]
 # Stores a new user. Fails when the email is taken: the table's unique
 # index decides, so two registrations racing for one address cannot both win.
 foul enroll(user: User, passwordHash: String) -> Result<User, String> do
-  let row = {
-    id: user.id,
-    email: user.email,
-    password_hash: passwordHash,
-    created_at: "${DateTime.utcNow()}"
-  }
   return Database.insert(DB.Schema.Users)
-    .values(row)
+    .record(user, extra: {password_hash: passwordHash, created_at: "${DateTime.utcNow()}"})
     .run
     .map { |_| user }
 end
 
 # The user registered under an email, with their stored password line.
 foul credentials(email: String) -> Result<(User, String)?, String> do
-  return Database.select().from(DB.Schema.Users)
-    .where(DB.Schema.Users.email == email)
-    .first
-    .map { |row| row.map { |found| (decoded(found), found.get("password_hash").or("")) } }
+  match Database.findBy(DB.Schema.Users, {email: email}).try do
+    None => return Ok(None)
+    Just(row) => do
+      let user = Database.decoded(row, User, {}).try
+      return Ok(Just((user, row.get("password_hash").or(""))))
+    end
+  end
 end
 
-foul member(id: String) -> Result<User?, String> do
-  return Database.select().from(DB.Schema.Users)
-    .where(DB.Schema.Users.id == id)
-    .first
-    .map { |row| row.map { |found| decoded(found) } }
-end
+foul member(id: String) -> Result<User?, String> = Database.find(DB.Schema.Users, id, as: User)
 
 # How many users there are.
-foul headcount -> Result<Integer, String> do
-  return Database.select([:id]).from(DB.Schema.Users)
-    .all
-    .map { |rows| rows.count }
-end
-
-private do
-  decoded : {String: String} -> User
-  let decoded(row) = User {
-    id: row.get("id").or(""),
-    email: row.get("email").or("")
-  }
-end
+foul headcount -> Result<Integer, String> = Database.select().from(DB.Schema.Users).count

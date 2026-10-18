@@ -1,0 +1,11 @@
+# A modal dialog: a heading, what goes in it, and what closing it means.
+# Escape and a click on the backdrop close it — `onClose` is sent to
+# whoever rendered the `<Dialog>`.
+client module App.UI.Dialog
+
+record Dialog do
+  heading : String
+  lead : String = ""
+  onClose : Metro.Event
+  children : Metro.View
+end
