@@ -2,7 +2,7 @@ package "metro" do
   version("0.1.0")
   license("LGPL-3.0-or-later")
   description("A Rails- and Phoenix-like web framework for Kex")
-  kex(">= 0.4.0-rc.1")
+  kex(">= 0.4.0-rc.2")
 
   # Metro's generators, as a Tey plugin: `tey generate metro:app` from a
   # package that depends on Metro. Tey asks for approval of the plugin when
