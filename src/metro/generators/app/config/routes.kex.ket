@@ -14,7 +14,8 @@ module Config.Routes
 
 using Metro.Live.Hub, only: [Hub]
 using Metro.Plugs, only: [providing]
-using Metro.Router, only: [pipeline, scope, get, post, live, static]
+# Qualify get: a storage capability loaded by an app can shadow the import.
+using Metro.Router, only: [pipeline, scope, post, live, static]
 # Actions are named bare, and so imported by name: a reference through the
 # module (`~App.Controllers.Home.show`) does not resolve when it is called
 # (kexhq/kex#476).
@@ -33,14 +34,14 @@ foul routes(hub) do
     pipeline(:guests, [App.Controllers.Application.signedOut()])
 
     scope "/", via: [:application, :browser, :guests] do
-      get("/signin", ~signInPage)
+      Metro.Router.get("/signin", ~signInPage)
       post("/signin", ~signIn)
-      get("/register", ~registrationPage)
+      Metro.Router.get("/register", ~registrationPage)
       post("/register", ~register)
     end
 
     scope "/", via: [:application, :browser, :members] do
-      get("/", ~show)
+      Metro.Router.get("/", ~show)
       post("/signout", ~signOut)
       # The home page kept current: events in, markup out. Behind the same
       # plugs as the page, so a socket from another site, or from nobody, is
