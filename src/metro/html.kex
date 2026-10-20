@@ -1,0 +1,69 @@
+# Metro.Html — building HTML as a tree, then rendering it.
+#
+#   using Metro.Html do
+#     render(html do
+#       head do
+#         title { text("Hello") }
+#       end
+#       body do
+#         h1 { text("Hello, world") }
+#         img({"src": "https://…/logo.png", "alt": "Logo"})
+#       end
+#     end)
+#   end
+#
+# A node is an element or text (`Node`), and an element's children are
+# collected from the block it is given — so a page is data, walked and
+# escaped once at render, not a string stitched together by hand. The element
+# constructors are generated at compile time from the lists of names, the way
+# Kex's own standard library generates its fused unit spellings.
+module Metro.Html do
+  # One element: its name, its attributes, and its children.
+  record Tag do
+    name : String
+    attributes : {String: String} = {}
+    children : [Node] = []
+  end
+
+  # One node of a page: an element, or text.
+  type Node = Tag(Tag) | Text(String)
+
+  # The elements that take children, and those that are void.
+  let ELEMENTS = ["html", "head", "body", "title", "header", "footer", "nav", "main", "section", "article", "aside", "div", "span", "strong", "em", "s", "p", "ul", "ol", "li", "a", "blockquote", "pre", "code", "form", "button", "select", "option", "label", "h1", "h2", "h3", "h4", "h5", "h6"]
+  let VOID = ["hr", "br", "input", "img", "meta", "link"]
+
+  # Text as a node; escaped when rendered.
+  text : String -> Node
+  let text(contents) = Text(contents)
+
+  # Text as content: escaped, so it is never markup.
+  escape : String -> String
+  let escape(contents) = Template.escapeHtml(contents)
+
+  compiled do
+    ELEMENTS.each do |name|
+      let %{name}(children: Block<[Node]> = {[]}) -> Node do
+        return Tag(Tag { name: name, children: children() })
+      end
+      let %{name}(attributes: {String: String}, children: Block<[Node]> = {[]}) -> Node do
+        return Tag(Tag { name: name, attributes: attributes, children: children() })
+      end
+    end
+    VOID.each do |name|
+      let %{name}(attributes: {String: String} = {}) -> Node = Tag(Tag { name: name, attributes: attributes })
+    end
+  end
+
+  # A node as markup: attributes and text escaped on the way out.
+  render : Node -> String
+  let render(Text(contents)) = escape(contents)
+  let render(Tag(tag)) do
+    let attributes = tag.attributes.entries.map { |entry|
+      match entry do
+        (name, value) => " ${name}=\"${escape(value)}\""
+      end
+    }.join("")
+    return "<${tag.name}${attributes}>" if VOID.contains?(tag.name)
+    return "<${tag.name}${attributes}>${tag.children.map { |child| render(child) }.join("")}</${tag.name}>"
+  end
+end

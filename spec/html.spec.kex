@@ -1,0 +1,61 @@
+using Metro.Html, as: Html
+
+describe("Metro.Html") do
+  it("renders an element with its children, collected from the block") do
+    let page = Html.div({"class": "message"}) do
+      Html.strong({}) do
+        Html.text("hi")
+      end
+      Html.text(" ")
+      Html.a({"href": "https://kex.dev"}) do
+        Html.text("kex")
+      end
+    end
+    Assert.equal(Html.render(page), "<div class=\"message\"><strong>hi</strong> <a href=\"https://kex.dev\">kex</a></div>")
+  end
+
+  it("renders a void element with no closing tag") do
+    Assert.equal(Html.render(Html.hr({})), "<hr>")
+    Assert.equal(Html.render(Html.input({"name": "f0", "type": "text"})), "<input name=\"f0\" type=\"text\">")
+  end
+
+  it("escapes text and attribute values, and never anything else") do
+    let page = Html.p({"title": "a<b>"}) do
+      Html.text("a<b> & c")
+    end
+    Assert.equal(Html.render(page), "<p title=\"a&lt;b&gt;\">a&lt;b&gt; &amp; c</p>")
+    Assert.equal(Html.render(Html.text("<b>")), "&lt;b&gt;")
+  end
+
+  it("nests as deeply as it is built") do
+    let list = Html.ul({}) do
+      Html.li({}) do
+        Html.text("one")
+      end
+      Html.li({}) do
+        Html.text("two")
+      end
+    end
+    Assert.equal(Html.render(list), "<ul><li>one</li><li>two</li></ul>")
+  end
+
+  it("allows an element with no children, the block left out") do
+    Assert.equal(Html.render(Html.div({})), "<div></div>")
+    Assert.equal(Html.render(Html.div({"class": "x"})), "<div class=\"x\"></div>")
+  end
+
+  it("builds a page with a scoped using, names unqualified") do
+    let page = using Metro.Html do
+      html do
+        head do
+          title { text("Hello") }
+        end
+        body do
+          h1 { text("Hello, world") }
+          img({"src": "https://example.com/logo.png", "alt": "Logo"})
+        end
+      end
+    end
+    Assert.equal(Metro.Html.render(page), "<html><head><title>Hello</title></head><body><h1>Hello, world</h1><img alt=\"Logo\" src=\"https://example.com/logo.png\"></body></html>")
+  end
+end
