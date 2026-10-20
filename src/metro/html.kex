@@ -36,6 +36,11 @@ module Metro.Html do
   text : String -> Node
   let text(contents) = Text(contents)
 
+  # An element from a list of children, for code that builds a page from
+  # data rather than from a block.
+  element : String -> {String: String} -> [Node] -> Node
+  let element(name, atts, children) = Tag(Tag { name: name, attributes: atts, children: children })
+
   # Text as content: escaped, so it is never markup.
   escape : String -> String
   let escape(contents) = Template.escapeHtml(contents)
@@ -60,6 +65,7 @@ module Metro.Html do
   let render(Tag(tag)) do
     let attributes = tag.attributes.entries.map { |entry|
       match entry do
+        (name, "") => " ${name}"
         (name, value) => " ${name}=\"${escape(value)}\""
       end
     }.join("")
