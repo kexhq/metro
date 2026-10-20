@@ -43,6 +43,13 @@
 
     socket.addEventListener("message", (message) => {
       if (message.data === "stale") return send({ event: "refresh" });
+      // The server ran into something it cannot recover from, and says what:
+      // shown where the connection state shows, and kept on screen by the
+      // server holding the socket open until the page is reloaded.
+      if (message.data.startsWith("error\n")) {
+        console.error("live:", message.data.slice(6));
+        return show("error", message.data.slice(6));
+      }
       const cut = message.data.indexOf("\n");
       if (message.data.slice(0, cut) === "render") render(message.data.slice(cut + 1));
     });
