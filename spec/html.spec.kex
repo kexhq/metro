@@ -58,4 +58,14 @@ describe("Metro.Html") do
     end
     Assert.equal(Metro.Html.render(page), "<html><head><title>Hello</title></head><body><h1>Hello, world</h1><img alt=\"Logo\" src=\"https://example.com/logo.png\"></body></html>")
   end
+
+  it("spreads a computed list into an unqualified children-only block") do
+    let nodes = [Metro.Html.text("a"), Metro.Html.text("b")]
+    let page = using Metro.Html do
+      p do
+        ...nodes
+      end
+    end
+    Assert.equal(Metro.Html.render(page), "<p>ab</p>")
+  end
 end
