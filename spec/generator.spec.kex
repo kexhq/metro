@@ -27,7 +27,7 @@ describe("Metro.Generators.App") do
   end
 
   it("fills the application's name in, and leaves a generated template's own tags alone") do
-    Assert.equal(files.count, 37)
+    Assert.equal(files.count, 38)
     Assert.truthy(written("package.kex").startsWith?("package \"chat_room\" do"))
     Assert.truthy(written("package.kex").contains?("tey(\"harmat\", git: \"https://github.com/kexhq/harmat\""))
     Assert.truthy(written("README.md").startsWith?("# ChatRoom"))
@@ -38,8 +38,7 @@ describe("Metro.Generators.App") do
     Assert.truthy(page.contains?("<%= ") && !page.contains?("<%%"))
     # The database is installed around the routes, not handed to them.
     Assert.truthy(written("main.kex").contains?("with Harmat.Connection = DB.Store.StoreConnection { store: store } do"))
-    Assert.truthy(written("main.kex").contains?("Metro.Console.opened(CONSOLE)"))
-    Assert.truthy(written("package.kex").contains?("command(\"console\", run: \"tey run console\""))
+    Assert.truthy(written("bin/console").contains?("/with Harmat.Connection = DB.Store.StoreConnection"))
     Assert.truthy(written("config/routes.kex").contains?("foul routes(hub) do"))
     Assert.truthy(written("db/repositories/users.kex").contains?("Database.select().from(DB.Schema.Users)"))
     # Nothing of the generator's own is left in what it writes.

@@ -1,0 +1,40 @@
+---
+params: [app: String, title: String]
+---
+#!/bin/sh
+# The application in Kex's REPL, as `bin/rails console` is: its modules and
+# its dependencies' in reach, its queries answered by this environment's
+# database (config/database.kex).
+#
+#   tey console               or bin/console
+#   METRO_ENV=test tey console
+set -eu
+
+# Tey runs this file as its Kex (TEY_KEX, below) to learn where the
+# application's modules are: asked to compile with `--source-root`s, it
+# prints them instead; anything else is the real Kex's.
+if [ -n "${METRO_CONSOLE_KEX:-}" ]; then
+  case " $* " in
+    *" --source-root "*) printf '%s\n' "$@"; exit 0 ;;
+    *) exec "$METRO_CONSOLE_KEX" "$@" ;;
+  esac
+fi
+
+cd "$(dirname "$0")/.."
+# The Kex Tey runs: TEY_KEX, or the toolchain Tey has selected.
+kex=${TEY_KEX:-${TEY_HOME:-$HOME/.local/share/tey}/bin/kex}
+[ -x "$kex" ] || kex=$(command -v kex)
+roots=$(METRO_CONSOLE_KEX="$kex" TEY_KEX="$PWD/bin/console" tey run)
+
+set --
+while IFS= read -r argument; do
+  if [ "$argument" = "--source-root" ]; then
+    IFS= read -r root
+    set -- "$@" --source-root "$root"
+  fi
+done <<EOF
+$roots
+EOF
+
+exec "$kex" "$@" \
+  -e '/with Harmat.Connection = DB.Store.StoreConnection { store: DB.Store.started(Config.Database.dsn.try).try }'

@@ -71,6 +71,7 @@ private do
     ("app/views/home/index.html.ket", Template.text(Kex.embed("app/app/views/home/index.html.ket.ket"))),
     ("app/views/layouts/application.html.ket", Template.text(Kex.embed("app/app/views/layouts/application.html.ket.ket"))),
     ("app/views/layouts/auth.html.ket", Template.text(Kex.embed("app/app/views/layouts/auth.html.ket.ket"))),
+    ("bin/console", Template.text(Kex.embed("app/bin/console.ket"))),
     ("config/database.kex", Template.text(Kex.embed("app/config/database.kex.ket"))),
     ("config/routes.kex", Template.text(Kex.embed("app/config/routes.kex.ket"))),
     ("docker-compose.yml", Template.text(Kex.embed("app/docker-compose.yml.ket"))),

@@ -155,32 +155,34 @@ tey new-app ../chat
 
 ## The console
 
-`tey console` opens the application in Kex's REPL, as `rails console` does:
-its modules and its dependencies' are in reach, and a query reaches the
-database this environment uses.
+`tey console` opens the application in Kex's REPL, as `bin/rails console`
+does: its modules and its dependencies' are in reach, and a query reaches
+the database this environment uses. It starts in seconds, since nothing is
+compiled before the REPL is.
 
 ```
 $ tey console
-kex(beam)> DB.Repositories.Users.maintained(id)
-  users (0.7ms)  SELECT … FROM users WHERE owner_organization_id = ?
-=> Ok([…]) : Result<[App.Models.User.User], String>
+kex(beam)> DB.Repositories.Users.headcount
+=> Ok(0) : Result<Integer, String>
 ```
 
-`Metro.Console.opened(lines)` starts it, and a generated `main.kex` calls it
-for `console`. Each line is entered before the first prompt as if typed;
-`/with` keeps a capability installed for the whole session:
+The command runs `bin/console`, which the generator writes. It asks Tey
+for the application's source roots (standing in for Kex while `tey run`
+names them), then starts `kex` with them and the lines to boot with, each
+entered as if typed before the first prompt; `/with` keeps a capability
+installed for the whole session:
 
-```kex
-Metro.Console.opened([
-  "/with Harmat.Logger = Config.Logging.queries()",
-  "/with Harmat.Connection = DB.Store.StoreConnection { store: DB.Store.started(Config.Database.dsn.try).try }"
-])
+```sh
+exec "$kex" "$@" \
+  -e '/with Harmat.Connection = DB.Store.StoreConnection { store: DB.Store.started(Config.Database.dsn.try).try }'
 ```
 
-Tey does not yet tell a program where its dependencies are, so Metro finds
-them as Tey does: tey.lock, package.local.kex and Tey's cache. Tey runs a
-command with its input piped, so the session has no history or line editing
-yet.
+An application that logs its queries adds its logger the same way, before
+the connection: `-e '/with Harmat.Logger = Config.Logging.queries()'`.
+
+Completion, history and line editing need a Tey whose commands are run on
+the terminal rather than through a pipe (Kex after `e4beb8c`); `bin/console`
+has them with any Tey.
 
 ## Live pages
 

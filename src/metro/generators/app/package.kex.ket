@@ -15,8 +15,8 @@ package "<%= app %>" do
   command("server", run: "tey run server", description: "Migrate, then serve on http://localhost:4000")
   command("migrate", run: "tey run migrate", description: "Run the migrations this database has not run")
   command("rollback", run: "tey run rollback", description: "Undo the newest migration (or the newest N)")
-  command("console", run: "tey run console", description: "The application in Kex's REPL, on this database")
   command("odbc", run: "sh script/setup-odbc.sh db/odbc", description: "Build Erlang's ODBC port program into db/odbc, once")
+  command("console", run: "sh bin/console", description: "The application in Kex's REPL, on this database")
 
   tey("harmat", git: "<%= harmat %>", branch: "<%= harmatBranch %>")
   tey("metro", git: "<%= metro %>", branch: "<%= metroBranch %>")

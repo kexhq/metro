@@ -6,7 +6,6 @@ params: [app: String, title: String]
 #   tey server      http://localhost:4000 — migrates first, then serves
 #   tey migrate     run the migrations this database has not run
 #   tey rollback    undo the newest migration; `tey rollback 3` undoes three
-#   tey console     the application in Kex's REPL, on this database
 #
 # METRO_ENV says where this is running, and PORT and HOST move the listener
 # (`Metro.Environment`); the environment and DATABASE_DSN choose the database
@@ -61,21 +60,7 @@ foul commanded(store: Server<DB.Store.Store>, args: [String]) -> Void do
   end
 end
 
-# What `tey console` boots with (Metro.Console): queries answered by this
-# environment's database, as where the application serves.
-let CONSOLE = [
-  "/with Harmat.Connection = DB.Store.StoreConnection { store: DB.Store.started(Config.Database.dsn.try).try }"
-]
-
-foul consoled -> Void do
-  match Metro.Console.opened(CONSOLE) do
-    Ok(status) => System.exit(status)
-    Error(reason) => failed(reason)
-  end
-end
-
 main(args) do
-  return consoled() if args.first == Just("console")
   match (Metro.Environment.current(), Config.Database.dsn) do
     (Error(reason), _) => failed(reason)
     (_, Error(reason)) => failed(reason)

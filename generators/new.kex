@@ -55,7 +55,7 @@ main(args) do
   FS.Directory.create(directory)
   let files = Metro.Generators.App.files(name, sources)
   let done = files.filter { |file| written(directory, file) }
-  ["script/setup.sh", "script/setup-odbc.sh"].each { |script| FS.File.changeMode(FS.Path.join(directory, script), 493) }
+  ["bin/console", "script/setup.sh", "script/setup-odbc.sh"].each { |script| FS.File.changeMode(FS.Path.join(directory, script), 493) }
   IO.printLine("${done.count} of ${files.count} files written.")
   IO.printLine("")
   IO.printLine("Next:")
