@@ -4,26 +4,23 @@
 #   Metro.Storage.received(request)       an upload's bytes, stored: a Blob
 #   Metro.Storage.served(request, blob)   a stored file, answered safely
 #
-# Where files go is a capability, `Metro.Storage.Service`. Outside any
+# Where files go is a capability, `Metro.Storage`. Outside any
 # `with` it is a folder — `storage`, or METRO_STORAGE_ROOT — and an
 # application installs another service the way it installs a database:
 #
-#   with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/slick/files" } do
+#   with Metro.Storage = Metro.Storage.Disk { root: "/var/lib/slick/files" } do
 #     site.start(host, port)
 #   end
 #
 # A service is anything that keeps bytes under a key and gives them back:
-# `make S3, implement: Metro.Storage.Service do … end` is another provider. What a
+# `make S3, implement: Metro.Storage do … end` is another provider. What a
 # file is called and who may see it is the application's to keep, with the
 # Blob `received` gives it; the service only ever sees keys.
 #
 # An upload is the file itself as a request's body, its name in an
 # `X-Filename` header (URI-encoded) and its type in `Content-Type`: what the
 # live script's `data-live-drop` sends, and nothing to parse.
-# Keep the capability separate from the helper module: installing a capability
-# named Metro.Storage still redirects helpers such as received to the provider
-# on Kex main 3111d30.
-capability Metro.Storage.Service do
+capability Metro.Storage do
   # Keeps `content` under `key`, replacing what was there.
   foul put(
     key: String,
@@ -73,7 +70,7 @@ module Metro.Storage do
     root : String
   end
 
-  make Disk, implement: Metro.Storage.Service do
+  make Disk, implement: Metro.Storage do
     foul put(
       key: String,
       content: Binary,
@@ -136,7 +133,7 @@ module Metro.Storage do
       byteSize: content.length,
       checksum: Digest.sha256(content).hex
     }
-    return Metro.Storage.Service.put(blob.key, content, blob.contentType)
+    return Metro.Storage.put(blob.key, content, blob.contentType)
       .map { |_| blob }
   end
 
@@ -146,7 +143,7 @@ module Metro.Storage do
   # opens one runs no script.
   served : WebRequest -> Blob -> WebRequest
   foul served(request, blob) do
-    match Metro.Storage.Service.get(blob.key) do
+    match Metro.Storage.get(blob.key) do
       Error(_) => return request.plain(404, "Not Found")
       Ok(content) => do
         let shown = INLINE.contains?(blob.contentType)

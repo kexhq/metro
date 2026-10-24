@@ -1,7 +1,7 @@
 describe("Metro.Storage") do
   it("keeps an upload in a folder under a new key, and answers with it safely") do
     let root = "storage_spec_${Metro.Clock.milliseconds()}"
-    with Metro.Storage.Service = Metro.Storage.Disk { root: root } do
+    with Metro.Storage = Metro.Storage.Disk { root: root } do
       let incoming = Metro.Wire.made(
         "POST",
         "/uploads",
@@ -14,7 +14,7 @@ describe("Metro.Storage") do
       Assert.equal(blob.contentType, "image/png")
       Assert.equal(blob.byteSize, 7)
       Assert.equal(blob.checksum, Digest.sha256("PNGDATA"))
-      let kept = Metro.Storage.Service.get(blob.key)
+      let kept = Metro.Storage.get(blob.key)
         .map { |content| content.to(String).or("") }
       Assert.equal(kept, Ok("PNGDATA"))
 
@@ -32,10 +32,10 @@ describe("Metro.Storage") do
       # Nothing for an empty body, nor a key that is a path.
       let empty = Metro.Wire.made("POST", "/uploads", [], "")
       Assert.truthy(Metro.Storage.received(Metro.WebRequest.WebRequest { incoming: empty }).error?)
-      Assert.truthy(Metro.Storage.Service.get("../etc/passwd").error?)
+      Assert.truthy(Metro.Storage.get("../etc/passwd").error?)
 
-      Metro.Storage.Service.delete(blob.key).try
-      Assert.truthy(Metro.Storage.Service.get(blob.key).error?)
+      Metro.Storage.delete(blob.key).try
+      Assert.truthy(Metro.Storage.get(blob.key).error?)
     end
     FS.Directory.deleteAll(root)
   end

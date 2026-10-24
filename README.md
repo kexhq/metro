@@ -153,6 +153,35 @@ checkout the same generator also runs in one step, with any Tey:
 tey new-app ../chat
 ```
 
+## The console
+
+`tey console` opens the application in Kex's REPL, as `rails console` does:
+its modules and its dependencies' are in reach, and a query reaches the
+database this environment uses.
+
+```
+$ tey console
+kex(beam)> DB.Repositories.Users.maintained(id)
+  users (0.7ms)  SELECT … FROM users WHERE owner_organization_id = ?
+=> Ok([…]) : Result<[App.Models.User.User], String>
+```
+
+`Metro.Console.opened(lines)` starts it, and a generated `main.kex` calls it
+for `console`. Each line is entered before the first prompt as if typed;
+`/with` keeps a capability installed for the whole session:
+
+```kex
+Metro.Console.opened([
+  "/with Harmat.Logger = Config.Logging.queries()",
+  "/with Harmat.Connection = DB.Store.StoreConnection { store: DB.Store.started(Config.Database.dsn.try).try }"
+])
+```
+
+Tey does not yet tell a program where its dependencies are, so Metro finds
+them as Tey does: tey.lock, package.local.kex and Tey's cache. Tey runs a
+command with its input piped, so the session has no history or line editing
+yet.
+
 ## Live pages
 
 A live page is three things you supply — a starting state, a function from
@@ -306,13 +335,13 @@ application starts:
 
 ```kex
 # The default: ./storage, or METRO_STORAGE_ROOT.
-with Metro.Storage.Service = Metro.Storage.Disk { root: "/var/lib/app/files" } do
+with Metro.Storage = Metro.Storage.Disk { root: "/var/lib/app/files" } do
   site.start(host, port)
 end
 ```
 
 Another provider is a record that implements `put`, `get` and `delete`
-by key: `make S3, implement: Metro.Storage.Service do … end`. Metro has only the
+by key: `make S3, implement: Metro.Storage do … end`. Metro has only the
 folder for now: S3 needs HMAC-SHA256 in Kex (kexhq/kex#459).
 
 A page marks where files may be dropped. Dropped, pasted or chosen files
