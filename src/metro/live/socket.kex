@@ -43,6 +43,25 @@ let repeated(entries, name) = entries.flatMap { |entry|
   end
 }
 
+# The event a message names, by its `event` field.
+named : [(String, String?)] -> String
+let named(entries) = field(entries, "event")
+
+# What part of an application answers an event: the first word of its name,
+# "bot" for "bot-create". An application routes events by it, and each part
+# answers its own by their whole names.
+resource : String -> String
+let resource(name) = name.split("-").first.or("")
+
+# What a step answers when nothing other tabs show has changed.
+unchanged : S -> (S, Bool)
+let unchanged(state) = (state, false)
+
+# What a step answers when it changed something other tabs show: they are
+# told to ask again.
+changed : S -> (S, Bool)
+let changed(state) = (state, true)
+
 # Serves one connection until the browser goes away.
 #
 # @param socket [Connection] the upgraded connection
