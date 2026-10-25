@@ -4,6 +4,10 @@ package "metro" do
   description("A Rails- and Phoenix-like web framework for Kex")
   kex(">= 0.4.0-rc.2")
 
+  # Each request, and each event of a live page, runs inside
+  # `Harmat.Database.cache`.
+  tey("harmat", git: "https://github.com/kexhq/harmat", tag: "v0.2.0")
+
   # Metro's generators, as a Tey plugin: `tey generate metro:app` from a
   # package that depends on Metro. Tey asks for approval of the plugin when
   # that package is installed.

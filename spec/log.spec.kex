@@ -1,0 +1,24 @@
+using Metro.Log, only: [Summary, line]
+using Harmat.Database, only: [Tally]
+
+describe("Metro.Log") do
+  it("says what a request cost, as Rails does") do
+    let request = Summary {
+      label: "GET /acmecorp",
+      status: Just(200),
+      micros: 45160,
+      database: Tally { sent: 12, cached: 3, micros: 5120 }
+    }
+    Assert.equal(line(request, false), "Completed GET /acmecorp 200 in 45.1ms (Database: 5.1ms, 15 queries, 3 cached)")
+  end
+
+  it("says where a live event's time went, part by part") do
+    let event = Summary {
+      label: "live message-send",
+      micros: 23400,
+      parts: [("Step", 8100), ("Render", 15300)],
+      database: Tally { sent: 1, micros: 600 }
+    }
+    Assert.equal(line(event, false), "Completed live message-send in 23.4ms (Step: 8.1ms | Render: 15.3ms | Database: 0.6ms, 1 query)")
+  end
+end

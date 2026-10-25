@@ -1,0 +1,23 @@
+# Metro.Logger — told when each request, and each event of a live page,
+# starts and when it is done: how long it took, where the time went, and
+# what it asked of the database. Outside any `with` nobody is told; a
+# program that wants to see it, as Rails shows it in development, installs
+# a logger where it serves:
+#
+#   with Metro.Logger = Metro.Log.Console {} do
+#     site.start(host, port)
+#   end
+#
+# `Metro.Log.Console` prints a line at each end:
+#
+#   Started GET /acmecorp
+#   Completed GET /acmecorp 200 in 45.1ms (Database: 5.1ms, 15 queries, 3 cached)
+#   Started live message-send
+#   Completed live message-send in 23.4ms (Step: 8.1ms | Render: 15.3ms | Database: 6.2ms, 14 queries, 9 cached)
+capability Metro.Logger do
+  # Something has started: "GET /acmecorp", or "live message-send".
+  foul started(label: String) -> Void = ()
+
+  # It is done, and this is what it cost.
+  foul completed(summary: Metro.Log.Summary) -> Void = ()
+end

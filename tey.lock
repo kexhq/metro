@@ -1,9 +1,10 @@
 {
   "version": 1,
-  "workspace": {"members": {"metro": "."}, "manifest_fingerprint": "25afdf39abf5ad87791ccf566bbaac52b21529c49fad1bb706cfb1b8894bad57"},
+  "workspace": {"members": {"metro": "."}, "manifest_fingerprint": "4a7d6fc6ee75161187f1489770484389701e8e29cb1fd7a5d279c74b543afbc3"},
   "toolchain": {"kex": "0.4.0", "kex_requirement": ">= 0.4.0-rc.2", "otp": 29, "otp_requirement": ""},
   "packages": {
-    "metro": {"version": "0.1.0", "source": "workspace", "git": "", "resolved": "", "commit": "", "subdir": "", "path": ".", "sha256": "", "groups": [], "dependencies": [], "plugins": {"metro": "24dec164236925c6876de7909ea1933fcb7f57a699e725b6eb894bbfe90c51b8"}, "workspace": true}
+    "harmat": {"version": "0.2.0", "source": "git", "git": "https://github.com/kexhq/harmat", "resolved": "v0.2.0", "commit": "e78b6cc33583d7b0b1f3be2e2d375d129d2ad929", "subdir": ".", "path": "", "sha256": "1d3faa4773f21f92ce6d4e5e319270f710c477526115735fd76be3e0b7051262", "groups": [], "dependencies": [], "plugins": {"harmat": "e814519349d9bc6158e6dea50d58aa87d068450254e48daca770411ef2de9949"}, "workspace": false},
+    "metro": {"version": "0.1.0", "source": "workspace", "git": "", "resolved": "", "commit": "", "subdir": "", "path": ".", "sha256": "", "groups": [], "dependencies": ["harmat"], "plugins": {"metro": "24dec164236925c6876de7909ea1933fcb7f57a699e725b6eb894bbfe90c51b8"}, "workspace": true}
   },
-  "plugins": {"approvals": {}}
+  "plugins": {"approvals": {"harmat": "e814519349d9bc6158e6dea50d58aa87d068450254e48daca770411ef2de9949"}}
 }

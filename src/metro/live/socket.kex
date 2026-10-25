@@ -4,7 +4,9 @@
 # A live view here is three things the application supplies: a starting
 # state, a function from (state, event) to the next state, and a function
 # from state to markup. `attached` runs them against a socket: render once,
-# then for every event the browser sends, step and render again.
+# then for every event the browser sends, step and render again. Each
+# render, and each step with the render after it, is one
+# `Harmat.Database.cache`: a query asked twice in it is sent once.
 #
 # The wire is text both ways (src/metro/live/live.js is the other end):
 #
@@ -79,13 +81,39 @@ foul attached(socket: Net.HTTP.WebSocket.Connection, hub: Server<Hub>, group: St
   let tab = "${Metro.Id.serial()}"
   hub.joined(tab, group, socket)
   var current = state
-  socket.send(Text("${RENDER}\n${render(current)}"))
+  Metro.Logger.started("live open")
+  let opened = Harmat.Database.tally()
+  let opening = Metro.Clock.microseconds()
+  socket.send(Text("${RENDER}\n${Harmat.Database.cache { render(current) }}"))
+  let rendering = Metro.Clock.microseconds() - opening
+  Metro.Logger.completed(Metro.Log.Summary {
+    label: "live open",
+    micros: rendering,
+    parts: [("Render", rendering)],
+    database: Harmat.Database.tally().since(opened)
+  })
   loop do
     match socket.receiveMessage do
       Ok(Text(message)) => do
-        let (following, changed?) = step(current, decoded(message))
+        let entries = decoded(message)
+        let label = "live ${field(entries, "event")}"
+        Metro.Logger.started(label)
+        let before = Harmat.Database.tally()
+        let began = Metro.Clock.microseconds()
+        let (following, changed?, stepping) = Harmat.Database.cache do
+          let (stepped, changed?) = step(current, entries)
+          let stepping = Metro.Clock.microseconds() - began
+          socket.send(Text("${RENDER}\n${render(stepped)}"))
+          (stepped, changed?, stepping)
+        end
+        let micros = Metro.Clock.microseconds() - began
+        Metro.Logger.completed(Metro.Log.Summary {
+          label: label,
+          micros: micros,
+          parts: [("Step", stepping), ("Render", micros - stepping)],
+          database: Harmat.Database.tally().since(before)
+        })
         current = following
-        socket.send(Text("${RENDER}\n${render(current)}"))
         if changed?
           hub.changed(tab, group)
         end

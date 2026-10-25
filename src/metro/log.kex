@@ -1,0 +1,61 @@
+# Metro.Log — what `Metro.Logger` (src/metro/logger.kex) is told, and the
+# console logger, as Rails prints requests in development.
+module Metro.Log do
+  # One request, or one event of a live page, done.
+  record Summary do
+    # "GET /acmecorp", or "live message-send".
+    label : String
+    # The status a request was answered with; `None` for a live event.
+    status : Integer? = None
+    # How long all of it took, in microseconds.
+    micros : Integer
+    # Where the time went, by part, in microseconds: ("Step", 8100) and
+    # ("Render", 15300) for a live event. The database is not one of them.
+    parts : [(String, Integer)] = []
+    # What it asked of the database.
+    database : Harmat.Database.Tally
+  end
+
+  # Prints each line to standard output while `shown?`: a program decides
+  # that where it starts, from its environment, say. Its colors are Kex's
+  # `Console` colors, which are off by themselves when the output is not a
+  # terminal, with NO_COLOR, or with --no-colors.
+  record Console do
+    shown? : Bool = true
+  end
+
+  make Console, implement: Metro.Logger do
+    foul started(label: String) -> Void do
+      IO.printLine("Started ${label}") if @shown?
+    end
+
+    foul completed(summary: Metro.Log.Summary) -> Void do
+      IO.printLine(Metro.Log.line(summary, true)) if @shown?
+    end
+  end
+
+  # What a summary is as Console prints it; plain when `colored?` is false.
+  line : Summary -> Bool -> String
+  let line(summary, colored?) do
+    let paint = { |text, style| colored? then Console.colorize(text, style) else text }
+    let status = summary.status
+      .map { |code| " ${paint("${code}", code < 400 then Console.GREEN else Console.RED)}" }
+      .or("")
+    let database = summary.database
+    # As Rails counts them: the cached ones are queries too.
+    let asked = database.sent + database.cached
+    let queries = asked == 1 then "1 query" else "${asked} queries"
+    let cached = database.cached == 0 then "" else ", ${database.cached} cached"
+    let parts = summary.parts.map do |part|
+      match part do
+        (name, micros) => "${name}: ${elapsed(micros)}"
+      end
+    end
+    let costs = (parts + ["Database: ${elapsed(database.micros)}, ${queries}${cached}"]).join(" | ")
+    "${paint("Completed", Console.BOLD)} ${summary.label}${status} in ${paint(elapsed(summary.micros), Console.BOLD)} ${paint("(${costs})", Console.DIM)}"
+  end
+
+  # Microseconds as milliseconds to a tenth: "0.4ms", "12.0ms".
+  elapsed : Integer -> String
+  let elapsed(micros) = "${micros / 1000}.${micros % 1000 / 100}ms"
+end

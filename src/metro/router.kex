@@ -252,7 +252,7 @@ private do
       let matched : Net.HTTP.RouteContext = context.route
       let request = WebRequest { incoming: Metro.Wire.received(incoming), captures: matched.parameters }
       match flat.socket do
-        None => written(ran(flat, request))
+        None => written(measured(flat, request))
         Just(handler) => do
           # The plugs decide before the socket opens: one that answers has
           # refused it, and its answer is what the browser gets.
@@ -263,5 +263,24 @@ private do
     end
   }
 
-  foul written(request: WebRequest) -> Net.HTTP.Response<Binary> = Net.HTTP.Response.binary(request.code, request.payload, request.outgoing)
+  # A request run in one `Harmat.Database.cache`, and told to the logger
+  # (`Metro.Logger`) — but a static file, which is not worth a line.
+  foul measured(flat: Flat, request: WebRequest) -> WebRequest do
+    return Harmat.Database.cache { ran(flat, request) } if flat.action.none?
+
+    let label = "${request.verb} ${request.path}"
+    Metro.Logger.started(label)
+    let before = Harmat.Database.tally()
+    let started = Metro.Clock.microseconds()
+    let answer = Harmat.Database.cache { ran(flat, request) }
+    Metro.Logger.completed(Metro.Log.Summary {
+      label: label,
+      status: Just(answer.code),
+      micros: Metro.Clock.microseconds() - started,
+      database: Harmat.Database.tally().since(before)
+    })
+    return answer
+  end
+
+  foul written(request: WebRequest) -> Net.HTTP.Response<Binary> =Net.HTTP.Response.binary(request.code, request.payload, request.outgoing)
 end
