@@ -123,6 +123,18 @@ let delete(path, action) = route("DELETE", path, action)
 live : String -> SocketHandler -> Entry
 let live(path, handler) = LiveEntry { path: path, handler: handler }
 
+# A live page whose events `events` routes (Metro.Live.Router): its socket
+# handler is handed the table along with the request and the socket.
+#
+#   live "/live", Config.Live.events() do |request, socket, events|
+#     App.Controllers.Chat.joined(request, socket, events)
+#   end
+live : String -> [(String, R)] -> (WebRequest -> Net.HTTP.WebSocket.Connection -> [(String, R)] -> Void) -> Entry
+let live(path, events, handler) = LiveEntry {
+  path: path,
+  handler: { |request, socket| handler(request, socket, events) }
+}
+
 # Serves the files of a directory: `/app.css` is `<directory>/app.css`. Put
 # it last — it matches every GET nothing above it did.
 static : String -> Entry

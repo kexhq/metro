@@ -1,0 +1,30 @@
+# Which part of an application answers an event from a live page, by the
+# first word of the event's name (`Metro.Live.Socket.resource`):
+#
+#   let events = Metro.Live.Router.define do
+#     on(["bot"]) { |name, event| App.Live.Bots.on(name, event) }
+#     on(["channel", "group"]) { |name, event| App.Live.Conversations.on(name, event) }
+#   end
+#
+# Each part answers its own events by their whole names. What a handler is
+# handed and answers is the application's: the router only finds it. A live
+# route takes the table beside its socket handler (`Metro.Router.live`), so
+# the application's routes say both where a live page is and who answers
+# its events.
+module Metro.Live.Router
+
+using Metro.Live.Socket, only: [resource]
+
+# The routes of a block, in order: earlier ones win.
+define : Block<[[(String, R)]]> -> [(String, R)]
+let define(routes) = routes().flatMap { |each| each }
+
+# One handler for the events whose names start with any of these words.
+on : [String] -> R -> [(String, R)]
+let on(words, handler) = words.map { |word| (word, handler) }
+
+# The handler for an event, by its name; `None` when no route has it.
+answering : [(String, R)] -> String -> R?
+let answering(routes, name) = routes
+  .find { |route| match route do (word, _) => word == resource(name) end }
+  .map { |route| match route do (_, handler) => handler end }

@@ -34,3 +34,32 @@ describe("Metro.Live.Client") do
     Assert.truthy(Metro.Live.Client.script.contains?("patchChildren"))
   end
 end
+
+describe("Metro.Live.Router") do
+  it("finds the handler for an event by the first word of its name") do
+    let events = Metro.Live.Router.define do
+      Metro.Live.Router.on(["bot"]) { |name, count| count + 1 }
+      Metro.Live.Router.on(["team", "group"]) { |name, count| count + name.count }
+    end
+    let ask = do |name|
+      Metro.Live.Router.answering(events, name).map { |answer| answer(name, 4) }.or(0)
+    end
+    Assert.equal(ask("bot-create"), 5)
+    Assert.equal(ask("group-new"), 13)
+    Assert.equal(ask("cancel"), 0)
+  end
+
+  it("hands a live route's socket handler its events") do
+    let events = Metro.Live.Router.define do
+      Metro.Live.Router.on(["bot"]) { |name, count| count }
+    end
+    let entry = Metro.Router.live "/live", events do |request, socket, routed|
+      Void
+    end
+    match entry do
+      Metro.Router.LiveEntry { path, handler } => Assert.equal(path, "/live")
+      _ => Assert.truthy(false)
+    end
+  end
+end
+
