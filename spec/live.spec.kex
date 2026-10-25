@@ -18,6 +18,7 @@ describe("Metro.Live.Socket") do
     Assert.equal(Metro.Live.Socket.field(entries, "name"), "Home mortgage")
     Assert.equal(Metro.Live.Socket.field(entries, "notes"), "")
     Assert.equal(Metro.Live.Socket.field(entries, "missing"), "")
+    Assert.equal(Metro.Live.Socket.typed(Metro.Live.Socket.decoded("name=++Home+"), "name"), "Home")
   end
 
   it("reads every value of a field sent more than once") do
@@ -60,6 +61,26 @@ describe("Metro.Live.Router") do
       Metro.Router.LiveEntry { path, handler } => Assert.equal(path, "/live")
       _ => Assert.truthy(false)
     end
+  end
+end
+
+describe("Metro.Live.Presence") do
+  it("counts somebody online until the last of their pages closes") do
+    let board = Process.spawn(Metro.Live.Presence.Presence {})
+    Assert.equal(Metro.Live.Presence.online(board), [])
+    Metro.Live.Presence.arrived(board, "u1", "one")
+    Metro.Live.Presence.arrived(board, "u1", "two")
+    Assert.equal(Metro.Live.Presence.online(board), ["u1"])
+    Metro.Live.Presence.departed(board, "u1", "one")
+    Assert.equal(Metro.Live.Presence.online(board), ["u1"])
+    Metro.Live.Presence.departed(board, "u1", "two")
+    Assert.equal(Metro.Live.Presence.online(board), [])
+  end
+
+  it("knows anybody by whatever they are called, spaces and all") do
+    let board = Process.spawn(Metro.Live.Presence.Presence {})
+    Metro.Live.Presence.arrived(board, "Ada Lovelace", "s1")
+    Assert.equal(Metro.Live.Presence.online(board), ["Ada Lovelace"])
   end
 end
 

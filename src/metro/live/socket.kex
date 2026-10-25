@@ -32,6 +32,10 @@ let field(entries, name) do
   end
 end
 
+# One named field of an event, trimmed: what somebody typed into it.
+typed : [(String, String?)] -> String -> String
+let typed(entries, name) = field(entries, name).trim
+
 # Every value of a field an event sent more than once, in the order sent:
 # the boxes ticked in a list of checkboxes of one name. Empty when it was
 # not sent.

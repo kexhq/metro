@@ -10,6 +10,10 @@
 #   Metro.Live.Presence.standing(board, "general", now)   # => [Note]
 #
 # Times are milliseconds since 1970, and the caller's: the board has no clock.
+#
+# Who has a page open is a topic of its own (`arrived`, `departed`,
+# `online`): one member per page, so that closing one of somebody's two tabs
+# does not make them look gone.
 module Metro.Live.Presence
 
 record Note do
@@ -55,3 +59,30 @@ foul standing(board, topic, now) do
     Error(_) => return []
   end
 end
+
+# The topic of who has a page open. A member there is "<seat> <who>": the
+# seat — a page's own token, without spaces — tells one of somebody's pages
+# from another, and `who` may be anything.
+let ONLINE = "online"
+
+# How long a page counts as open without being said again: a day.
+let OPEN_FOR = 86400000
+
+# Somebody has a page open: `seat` is that page's own.
+arrived : Server<Presence> -> String -> String -> Void
+foul arrived(board, who, seat) do
+  board.noted(ONLINE, "${seat} ${who}", "", Metro.Clock.milliseconds() + OPEN_FOR)
+end
+
+# One of somebody's pages has closed.
+departed : Server<Presence> -> String -> String -> Void
+foul departed(board, who, seat) do
+  board.lifted(ONLINE, "${seat} ${who}")
+end
+
+# Who has a page open, each once however many they have.
+online : Server<Presence> -> [String]
+foul online(board) = standing(board, ONLINE, Metro.Clock.milliseconds())
+  .map { |note| note.member.split(" ").drop(1).join(" ") }
+  .uniq
+
