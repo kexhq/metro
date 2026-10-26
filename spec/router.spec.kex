@@ -54,6 +54,10 @@ foul answer(request: WebRequest) -> (Integer, String) do
 end
 
 describe("Metro.Router") do
+  it("lists literal root segments for organization-name checks") do
+    Assert.equal(routes.rootSegments, ["app", "broken", "nowhere", "silent"])
+  end
+
   it("lists every route with its whole path, in order") do
     Assert.equal(routes.listing, [
       "GET /", "GET /silent", "GET /broken", "GET /app/me", "POST /app/go",
