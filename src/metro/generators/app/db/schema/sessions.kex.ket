@@ -6,20 +6,14 @@ params: [app: String, title: String]
 module DB.Schema.Sessions
 
 using Harmat.Table, as: Table
-using Harmat.Table, only: [Definition]
-
-compiled do
-  let definition = Table.define :sessions do |t|
-    t.text(:token_digest, primaryKey: true)
-    t.text(:user_id)
-    t.bigint(:expires_at)
-    t.text(:created_at)
-  end
-
-  let table = DB.Schema.Sessions.definition.table
-
-  let tokenDigest = DB.Schema.Sessions.definition.textColumn(:token_digest)
-  let userId = DB.Schema.Sessions.definition.textColumn(:user_id)
-  let expiresAt = DB.Schema.Sessions.definition.wholeColumn(:expires_at)
-  let createdAt = DB.Schema.Sessions.definition.textColumn(:created_at)
+let definition = Table.define :sessions do |t|
+  t.text(:token_digest, primaryKey: true)
+  t.text(:user_id)
+  t.bigint(:expires_at)
+  t.text(:created_at)
 end
+
+let tokenDigest = definition.textColumn(:token_digest)
+let userId = definition.textColumn(:user_id)
+let expiresAt = definition.wholeColumn(:expires_at)
+let createdAt = definition.textColumn(:created_at)
