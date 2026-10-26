@@ -8,16 +8,18 @@ module DB.Schema.Users
 using Harmat.Table, as: Table
 using Harmat.Table, only: [Definition]
 
-let definition = Table.define :users do |t|
-  t.text(:id, primaryKey: true)
-  t.text(:email)
-  t.text(:password_hash)
-  t.text(:created_at)
+compiled do
+  let definition = Table.define :users do |t|
+    t.text(:id, primaryKey: true)
+    t.text(:email)
+    t.text(:password_hash)
+    t.text(:created_at)
+  end
+
+  let table = DB.Schema.Users.definition.table
+
+  let id = DB.Schema.Users.definition.textColumn(:id)
+  let email = DB.Schema.Users.definition.textColumn(:email)
+  let passwordHash = DB.Schema.Users.definition.textColumn(:password_hash)
+  let createdAt = DB.Schema.Users.definition.textColumn(:created_at)
 end
-
-let table = DB.Schema.Users.definition.table
-
-let id = DB.Schema.Users.definition.textColumn(:id)
-let email = DB.Schema.Users.definition.textColumn(:email)
-let passwordHash = DB.Schema.Users.definition.textColumn(:password_hash)
-let createdAt = DB.Schema.Users.definition.textColumn(:created_at)

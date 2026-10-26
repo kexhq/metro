@@ -10,8 +10,10 @@ using Harmat.Table, only: [Definition]
 # Each table under the name of its own module, so that a query reads
 # `.from(DB.Schema.Users)` and a condition `DB.Schema.Users.email == email`:
 # the name alone is the table, and a name after it is one of its columns.
-let Users = DB.Schema.Users.definition
-let Sessions = DB.Schema.Sessions.definition
+compiled do
+  let Users = DB.Schema.Users.definition
+  let Sessions = DB.Schema.Sessions.definition
+end
 
 tables : [Definition]
 let tables = [
