@@ -27,8 +27,11 @@ describe("Metro.Generators.App") do
   end
 
   it("fills the application's name in, and leaves a generated template's own tags alone") do
-    Assert.equal(files.count, 38)
+    Assert.equal(files.count, 39)
     Assert.truthy(written("package.kex").startsWith?("package \"chat_room\" do"))
+    Assert.truthy(written("package.kex").contains?("command(\"db:create\", run: \"sh script/database.sh create\""))
+    Assert.truthy(written("package.kex").contains?("command(\"db:drop\", run: \"sh script/database.sh drop\""))
+    Assert.truthy(written("script/database.sh").contains?("create|drop"))
     Assert.truthy(written("package.kex").contains?("tey(\"harmat\", git: \"https://github.com/kexhq/harmat\""))
     Assert.truthy(written("README.md").startsWith?("# ChatRoom"))
     # A page of the application is a template itself: its front matter and

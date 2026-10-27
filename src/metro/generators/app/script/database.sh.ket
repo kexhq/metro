@@ -1,0 +1,63 @@
+---
+params: [app: String, title: String]
+---
+#!/bin/sh
+# Create or drop the SQLite database chosen by this application's environment.
+set -eu
+
+action=${1:-}
+case "$action" in
+  create|drop) ;;
+  *) echo 'usage: sh script/database.sh create|drop' >&2; exit 2 ;;
+esac
+
+if [ -n "${DATABASE_DSN:-}" ]; then
+  driver=$(printf '%s\n' "$DATABASE_DSN" | sed -n 's/.*[Dd][Rr][Ii][Vv][Ee][Rr]=\([^;]*\).*/\1/p' | tr '[:upper:]' '[:lower:]')
+  case "$driver" in
+    *sqlite*) ;;
+    *) echo 'database create/drop currently supports SQLite DSNs only' >&2; exit 1 ;;
+  esac
+  file=$(printf '%s\n' "$DATABASE_DSN" | sed -n 's/.*[Dd][Aa][Tt][Aa][Bb][Aa][Ss][Ee]=\([^;]*\).*/\1/p')
+else
+  case "${METRO_ENV:-development}" in
+    development) file=db/development.sqlite3 ;;
+    test) file=db/test.sqlite3 ;;
+    production) echo 'database create/drop needs a SQLite DATABASE_DSN in production' >&2; exit 1 ;;
+    *) echo "unknown METRO_ENV: ${METRO_ENV}" >&2; exit 1 ;;
+  esac
+fi
+
+case "$file" in
+  ''|/|.) echo 'database path is empty or unsafe' >&2; exit 1 ;;
+esac
+
+if [ "$action" = create ]; then
+  if [ -e "$file" ]; then
+    echo "Database already exists: $file"
+  else
+    mkdir -p "$(dirname "$file")"
+    : > "$file"
+    echo "Created database: $file"
+  fi
+else
+  if [ ! -e "$file" ]; then
+    echo "Database does not exist: $file"
+  else
+    if command -v lsof >/dev/null 2>&1; then
+      if lsof "$file" >/dev/null 2>&1; then
+        echo "Database is in use: $file" >&2
+        exit 1
+      fi
+    elif command -v fuser >/dev/null 2>&1; then
+      if fuser "$file" >/dev/null 2>&1; then
+        echo "Database is in use: $file" >&2
+        exit 1
+      fi
+    else
+      echo 'cannot check whether the database is open; install lsof or fuser' >&2
+      exit 1
+    fi
+    rm "$file"
+    echo "Dropped database: $file"
+  fi
+fi

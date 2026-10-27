@@ -38,6 +38,11 @@ spec/
 
 ## Database
 
+`tey db:create` and `tey db:drop` create or remove the SQLite file selected
+by `METRO_ENV`, or a SQLite `DATABASE_DSN`. `db:drop` refuses to remove a
+file while a process has it open. PostgreSQL databases are managed by
+PostgreSQL and are unaffected by these commands.
+
 | `METRO_ENV` | Database |
 | --- | --- |
 | `development` (default) | SQLite, `db/development.sqlite3` |
@@ -45,8 +50,10 @@ spec/
 | `production` | whatever `DATABASE_DSN` names |
 
 ```sh
+tey db:create
 tey migrate
 tey rollback
+tey db:drop  # when you want a clean database
 ```
 
 ## Docker
