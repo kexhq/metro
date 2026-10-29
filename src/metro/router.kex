@@ -93,6 +93,10 @@ end
 define : Block<[Entry]> -> Router
 let define(entries) = Router { entries: entries() }
 
+# A path used by both the router and an application's links or address parser.
+routePath : String -> Metro.Path.Path
+let routePath(template) = Metro.Path.define(template)
+
 pipeline : Atom -> [Plug] -> Entry
 let pipeline(label, plugs) = PipelineEntry { label: label, plugs: plugs }
 
@@ -163,6 +167,15 @@ make Router do
 
   # What `tey routes` would print: verb and path, one a line.
   let listing -> [String] = this.table.map { |flat| "${flat.verb} ${flat.path}" }
+
+  # Literal top-level path segments the router owns. A dynamic first segment
+  # such as `:organization` does not reserve any particular name.
+  let rootSegments -> [String] = this.table.reduce([]) { |found, flat|
+    match Metro.Path.define(flat.path).rootSegment do
+      Just(segment) => found + [segment]
+      None => found
+    end
+  }.uniq.sort
 
   # Answers a request without a server: for specs, and for nothing else. The
   # matching here is this module's own and simpler than the server's.

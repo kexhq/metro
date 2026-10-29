@@ -42,6 +42,12 @@ let asking(address, fields) do
 end
 
 make Path do
+  # The literal first segment, when this address owns a top-level path.
+  # Dynamic roots such as `/:organization/...` have none.
+  let rootSegment -> String? = segments(@template).first.flatMap { |segment|
+    segment.startsWith?(":") || segment.startsWith?("*") then None else Just(segment)
+  }
+
   # The address for these parts. A part that is not given is left empty.
   let filled(parts: {String: String}) -> String do
     let written = segments(@template).map { |segment|

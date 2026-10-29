@@ -44,6 +44,9 @@ describe("Metro.Generators.App") do
     Assert.truthy(written("bin/console").contains?("/with Harmat.Connection = DB.Store.StoreConnection"))
     Assert.truthy(written("config/routes.kex").contains?("foul routes(hub) do"))
     Assert.truthy(written("db/repositories/users.kex").contains?("Database.select().from(DB.Schema.Users)"))
+    Assert.truthy(written("db/schema.kex").contains?("compiled do"))
+    Assert.truthy(written("db/schema/users.kex").contains?("compiled do"))
+    Assert.truthy(written("db/schema/sessions.kex").contains?("compiled do"))
     # Nothing of the generator's own is left in what it writes.
     Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("<%= app %>") || text.contains?("<%= title %>") end })
   end

@@ -6,8 +6,6 @@ params: [app: String, title: String]
 module DB.Schema.Users
 
 using Harmat.Table, as: Table
-using Harmat.Table, only: [Definition]
-
 let definition = Table.define :users do |t|
   t.text(:id, primaryKey: true)
   t.text(:email)
@@ -15,9 +13,7 @@ let definition = Table.define :users do |t|
   t.text(:created_at)
 end
 
-let table = DB.Schema.Users.definition.table
-
-let id = DB.Schema.Users.definition.textColumn(:id)
-let email = DB.Schema.Users.definition.textColumn(:email)
-let passwordHash = DB.Schema.Users.definition.textColumn(:password_hash)
-let createdAt = DB.Schema.Users.definition.textColumn(:created_at)
+let id = definition.textColumn(:id)
+let email = definition.textColumn(:email)
+let passwordHash = definition.textColumn(:password_hash)
+let createdAt = definition.textColumn(:created_at)

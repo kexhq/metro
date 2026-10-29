@@ -56,6 +56,10 @@ serving Store do
     return { reply: Harmat.Odbc.execute(@connection, statement) }
   end
 
+  foul slot ranMany(statement: Statement) -> Reply<Result<Integer, String>> do
+    return { reply: Harmat.Odbc.executeMany(@connection, statement) }
+  end
+
   foul slot asked(statement: Statement) -> Reply<Result<[[String]], String>> do
     return { reply: Harmat.Odbc.query(@connection, statement) }
   end
@@ -93,6 +97,13 @@ make StoreConnection, implement: Harmat.Connection do
     match Harmat.Database.ongoing() do
       Just(connection) => return Harmat.Odbc.executing(connection, statement)
       None => return flat(@store.ran(statement))
+    end
+  end
+
+  foul runMany(statement: Harmat.Odbc.Statement) -> Result<Integer, String> do
+    match Harmat.Database.ongoing() do
+      Just(connection) => return Harmat.Odbc.executingMany(connection, statement)
+      None => return flat(@store.ranMany(statement))
     end
   end
 

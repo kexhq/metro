@@ -18,19 +18,19 @@ foul admit(tokenDigest: String, userId: String, expiresAt: Integer) -> Result<In
     expires_at: expiresAt,
     created_at: "${DateTime.utcNow()}"
   }
-  return Database.insert(DB.Schema.Sessions)
+  return Database.insert(DB.Schema.Sessions.definition)
     .values(row)
     .run
 end
 
 # Whose session a digest is, and when it expires (seconds since 1970).
 foul holder(tokenDigest: String) -> Result<(String, Integer)?, String> do
-  return Database.findBy(DB.Schema.Sessions, {token_digest: tokenDigest})
+  return Database.findBy(DB.Schema.Sessions.definition, {token_digest: tokenDigest})
     .map { |row| row.map { |found| (found.get("user_id").or(""), found.get("expires_at").or("").trim.to(Integer).or(0)) } }
 end
 
 foul revoke(tokenDigest: String) -> Result<Bool, String> do
-  return Database.delete(DB.Schema.Sessions)
+  return Database.delete(DB.Schema.Sessions.definition)
     .by({token_digest: tokenDigest})
     .run
     .map { |count| count > 0 }
