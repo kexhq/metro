@@ -21,8 +21,8 @@ params: [app: String, title: String]
 # db/schema. The server refuses to start when db/schema and the migrations
 # disagree.
 #
-#   tey migrate          # run what this database has not run
-#   tey rollback         # undo the newest; `tey rollback 3` undoes three
+#   tey db:migrate       # run what this database has not run
+#   tey db:rollback      # undo the newest; `tey db:rollback 3` undoes three
 module DB.Migrations
 
 using Harmat.Migration, as: Migration

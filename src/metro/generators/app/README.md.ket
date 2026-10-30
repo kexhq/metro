@@ -51,8 +51,8 @@ PostgreSQL and are unaffected by these commands.
 
 ```sh
 tey db:create
-tey migrate
-tey rollback
+tey db:migrate
+tey db:rollback
 tey db:drop  # when you want a clean database
 ```
 
