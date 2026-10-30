@@ -14,6 +14,15 @@ describe("Metro.Environment") do
     end
   end
 
+  it("is test under a spec, unless METRO_ENV says otherwise") do
+    with ENV = Mock.Env { vars: {"KEX_TEST": "1"} } do
+      Assert.equal(Metro.Environment.current(), Ok(Test))
+    end
+    with ENV = Mock.Env { vars: {"KEX_TEST": "1", "METRO_ENV": "development"} } do
+      Assert.equal(Metro.Environment.current(), Ok(Development))
+    end
+  end
+
   it("refuses a name that is none of the three") do
     with ENV = Mock.Env { vars: {"METRO_ENV": "prod"} } do
       Assert.equal(Metro.Environment.current(), Error("METRO_ENV must be development, test or production, not prod"))

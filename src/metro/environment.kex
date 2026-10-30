@@ -1,7 +1,8 @@
 # Metro.Environment — where this process is running, read the same way by
 # every Metro application.
 #
-#   METRO_ENV   development (the default), test or production
+#   METRO_ENV   development (the default), test or production; test is the
+#               default under a spec, which Kex marks with KEX_TEST
 #   PORT        the port the application listens on; 4000 unless set
 #   HOST        the address it binds; 127.0.0.1 unless set
 #
@@ -21,11 +22,13 @@ type Environment = Development | Test | Production
 # The variable every Metro application's environment is chosen with.
 let VARIABLE = "METRO_ENV"
 
-# The environment METRO_ENV names, `Development` when it is not set. A name
-# that is none of the three is an error, not a guess: a misspelt
-# `production` must not quietly run as development.
+# The environment METRO_ENV names. When it is not set: `Test` under a spec
+# (`kex` sets KEX_TEST for one, so `tey test` never reaches the development
+# database), `Development` otherwise. A name that is none of the three is an
+# error, not a guess: a misspelt `production` must not quietly run as
+# development.
 current : Result<Environment, String>
-foul current = named(ENV.get(VARIABLE).or("development"))
+foul current = named(ENV.get(VARIABLE).or(ENV.get("KEX_TEST").set? then "test" else "development"))
 
 private do
   named : String -> Result<Environment, String>
