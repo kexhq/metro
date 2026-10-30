@@ -4,8 +4,8 @@ params: [app: String, title: String]
 # <%= title %>
 #
 #   tey server      http://localhost:4000 — migrates first, then serves
-#   tey migrate     run the migrations this database has not run
-#   tey rollback    undo the newest migration; `tey rollback 3` undoes three
+#   tey db:migrate  run the migrations this database has not run
+#   tey db:rollback undo the newest migration; `tey db:rollback 3` undoes three
 #
 # METRO_ENV says where this is running, and PORT and HOST move the listener
 # (`Metro.Environment`); the environment and DATABASE_DSN choose the database
