@@ -43,10 +43,11 @@ describe("Metro.Generators.App") do
     Assert.truthy(written("main.kex").contains?("with Harmat.Connection = DB.Store.StoreConnection { store: store } do"))
     Assert.truthy(written("bin/console").contains?("/with Harmat.Connection = DB.Store.StoreConnection"))
     Assert.truthy(written("config/routes.kex").contains?("foul routes(hub) do"))
-    Assert.truthy(written("db/repositories/users.kex").contains?("Database.select().from(DB.Schema.Users)"))
-    Assert.truthy(written("db/schema.kex").contains?("compiled do"))
-    Assert.truthy(written("db/schema/users.kex").contains?("compiled do"))
-    Assert.truthy(written("db/schema/sessions.kex").contains?("compiled do"))
+    Assert.truthy(written("db/repositories/users.kex").contains?("Database.findBy(DB.Schema.Users.definition, {email: email})"))
+    # Each table is a plain definition, gathered in db/schema.kex.
+    Assert.truthy(written("db/schema.kex").contains?("DB.Schema.Users.definition"))
+    Assert.truthy(written("db/schema/users.kex").contains?("let definition = Table.define :users do |t|"))
+    Assert.truthy(written("db/schema/sessions.kex").contains?("let definition = Table.define :sessions do |t|"))
     # Nothing of the generator's own is left in what it writes.
     Assert.falsy(files.any? { |file| match file do (_, text) => text.contains?("<%= app %>") || text.contains?("<%= title %>") end })
   end
