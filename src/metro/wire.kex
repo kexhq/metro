@@ -36,7 +36,10 @@ let bytesOf(incoming) = incoming.raw.body
 
 # A request made by hand, for specs.
 made : String -> String -> [(String, String)] -> String -> Incoming
-let made(method, address, headers, body) = Incoming { raw: Request {
-  method: method, target: URI.parse(address).or(URI.parse("/").try),
-  headers: Headers.from(headers).or(Headers.empty), body: body.to(Binary).or(Binary.empty)
-} }
+let made(method, address, headers, body) do
+  let Ok(root) = URI.parse("/")
+  Incoming { raw: Request {
+    method: method, target: URI.parse(address).or(root),
+    headers: Headers.from(headers).or(Headers.empty), body: body.to(Binary).or(Binary.empty)
+  } }
+end
