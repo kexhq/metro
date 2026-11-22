@@ -11,10 +11,10 @@
 module Metro.Clock
 
 seconds : Integer
-foul seconds = Time.floorDiv(DateTime.epochNanos(), 1000000000)
+foul seconds = DateTime.epochNanos().div(1000000000)
 
 milliseconds : Integer
-foul milliseconds = Time.floorDiv(DateTime.epochNanos(), 1000000)
+foul milliseconds = DateTime.epochNanos().div(1000000)
 
 microseconds : Integer
-foul microseconds = Time.floorDiv(DateTime.epochNanos(), 1000)
+foul microseconds = DateTime.epochNanos().div(1000)
