@@ -77,9 +77,9 @@ make WebRequest do
     return named(decoded(text), name) if text.take(1) != "{"
 
     match JSON.parse(text) do
-      Ok(value) => do
-        let fields : {String: Any} = value
-        return fields.get(name).map { |found| "${found}" }
+      Ok(value) => match value do
+        fields: {String: Any} => return fields.get(name).map { |found| "${found}" }
+        _ => return None
       end
       Error(_) => return None
     end
@@ -88,10 +88,12 @@ make WebRequest do
   # A field of a JSON body that is a list; empty when there is no such list.
   let list(name: String) -> [Any] do
     match JSON.parse(this.requestBody) do
-      Ok(value) => do
-        let fields : {String: Any} = value
-        let found : [Any] = fields.get(name).or([])
-        return found
+      Ok(value) => match value do
+        fields: {String: Any} => match fields.get(name).or([]) do
+          found: [Any] => return found
+          _ => return []
+        end
+        _ => return []
       end
       Error(_) => return []
     end
