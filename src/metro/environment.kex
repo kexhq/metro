@@ -40,7 +40,7 @@ end
 
 # The port to listen on.
 port : Integer
-foul port = ENV.get("PORT").flatMap { |text| text.to(Integer) }.or(4000)
+foul port = ENV.get("PORT").into { |text| text.to(Integer) }.or(4000)
 
 # The address to bind.
 host : String

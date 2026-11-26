@@ -42,7 +42,7 @@ let typed(entries, name) = field(entries, name).trim
 # the boxes ticked in a list of checkboxes of one name. Empty when it was
 # not sent.
 repeated : [(String, String?)] -> String -> [String]
-let repeated(entries, name) = entries.flatMap { |entry|
+let repeated(entries, name) = entries.into { |entry|
   match entry do
     (key, Just(value)) => key == name then [value] else []
     _ => []

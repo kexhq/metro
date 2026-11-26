@@ -70,7 +70,7 @@ type Entry = PipelineEntry | RouteEntry | LiveEntry | StaticEntry | ScopeEntry
 
 # The usual seven actions of a thing kept somewhere, any of them left out:
 #
-#   let resource = Resource { index: Just(~index), create: Just(~create) }
+#   foul resource -> Resource = Resource { index: Just(~index), create: Just(~create) }
 #
 #   index   GET    /things          show    GET    /things/:id
 #   new     GET    /things/new      edit    GET    /things/:id/edit
@@ -149,7 +149,7 @@ let resources(path, actions) = ScopeEntry { prefix: path, through: [], children:
   offered("GET", "/", actions.index), offered("GET", "/new", actions.new), offered("POST", "/", actions.create),
   offered("GET", "/:id", actions.show), offered("GET", "/:id/edit", actions.edit),
   offered("PUT", "/:id", actions.update), offered("PATCH", "/:id", actions.update), offered("DELETE", "/:id", actions.delete)
-].flatMap { |found| found } }
+].into { |found| found } }
 
 # One route as it is served: its whole path, and every plug in front of it.
 record Flat do
@@ -202,13 +202,13 @@ private do
   # the scopes around.
   flattened : [Entry] -> String -> [Plug] -> [PipelineEntry] -> [Flat]
   let flattened(entries, prefix, stack, inherited) do
-    let known = inherited + entries.flatMap { |entry|
+    let known = inherited + entries.into { |entry|
       match entry do
         PipelineEntry { label, plugs } => [PipelineEntry { label: label, plugs: plugs }]
         _ => []
       end
     }
-    entries.flatMap { |entry|
+    entries.into { |entry|
       match entry do
         RouteEntry { verb, path, action } => [Flat { verb: verb, path: joined(prefix, path), plugs: stack, action: Just(action) }]
         LiveEntry { path, handler } => [Flat { verb: "GET", path: joined(prefix, path), plugs: stack, socket: Just(handler) }]
@@ -222,7 +222,7 @@ private do
   # The plugs of the named pipelines, in the order named. A name nothing
   # declared is a mistake in the router, and stops it being built.
   piped : [Atom] -> [PipelineEntry] -> [Plug]
-  let piped(names, known) = names.flatMap { |name|
+  let piped(names, known) = names.into { |name|
     match known.find { |pipeline| pipeline.label == name } do
       Just(found) => found.plugs
       None => [do |request| request.plain(500, "Metro.Router: no pipeline is called ${name}") end]

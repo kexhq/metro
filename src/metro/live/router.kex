@@ -17,7 +17,7 @@ using Metro.Live.Socket, only: [resource]
 
 # The routes of a block, in order: earlier ones win.
 define : Block<[[(String, R)]]> -> [(String, R)]
-let define(routes) = routes().flatMap { |each| each }
+let define(routes) = routes().into { |each| each }
 
 # One handler for the events whose names start with any of these words.
 on : [String] -> R -> [(String, R)]
