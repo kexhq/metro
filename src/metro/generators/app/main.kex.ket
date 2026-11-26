@@ -55,7 +55,7 @@ foul commanded(store: Server<DB.Store.Store>, args: [String]) -> Void do
   match args.first.or("server") do
     "server" => upToDate(store) then served(store) else ()
     "migrate" => upToDate(store) then IO.printLine("The database is up to date.") else ()
-    "rollback" => undone(store, args.second.flatMap { |text| text.to(Integer) }.or(1))
+    "rollback" => undone(store, args.second.into { |text| text.to(Integer) }.or(1))
     other => failed("unknown command ${other}; expected server, migrate or rollback")
   end
 end

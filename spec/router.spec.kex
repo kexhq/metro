@@ -6,7 +6,7 @@ module Things do
   foul show(request: WebRequest) -> WebRequest = request.plain("thing ${request.param("id").or("?")}")
   foul create(request: WebRequest) -> WebRequest = request.json(201, {"made": request.param("name").or("")})
 
-  let resource = Resource { index: Just(~index), show: Just(~show), create: Just(~create) }
+  foul resource -> Resource = Resource { index: Just(~index), show: Just(~show), create: Just(~create) }
 end
 
 # Lets a request with the right header through, noting who it is.
@@ -25,11 +25,14 @@ let routes = Metro.Router.define do
 
   get "/" do |request| request.html("<h1>home</h1>") end
   get "/silent" do |request| request end
-  get "/broken" do |request| request.plain(Error("it broke").try) end
+  get "/broken" do |request|
+    let Just(reason) = request.param("missing")
+    request.plain(reason)
+  end
 
   scope "/app", via: [:marked, :members] do
     get "/me" do |request|
-      let name : String = request.assigned(:user).try
+      let Just(name) = request.assigned(:user)
       request.plain("you are ${name}")
     end
     post "/go" do |request| request.redirect("/app/me") end

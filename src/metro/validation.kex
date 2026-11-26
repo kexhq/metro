@@ -50,7 +50,7 @@ make Changeset do
 
   # The messages for one field.
   on :> String -> [String]
-  let on(name) = @errors.flatMap { |problem| match problem do (field, message) => field == name then [message] else [] end }
+  let on(name) = @errors.into { |problem| match problem do (field, message) => field == name then [message] else [] end }
 
   # Every message, without its field: for a list above a form.
   messages :> [String]
@@ -126,7 +126,7 @@ let passing(complaint, test) = Passing(test, complaint)
 checked : [Rule] -> {String: String} -> Changeset
 let checked(declared, values) = Changeset {
   values: values,
-  errors: declared.flatMap { |rule| broken(rule, values) }
+  errors: declared.into { |rule| broken(rule, values) }
 }
 
 # Only the fields named, out of what a browser sent: a form may not set what
@@ -150,7 +150,7 @@ private do
   broken : Rule -> {String: String} -> [(String, String)]
   let broken(Validates(name, label, checks), values) do
     let text = given(values, name)
-    let failures = checks.flatMap { |check|
+    let failures = checks.into { |check|
       match failure(check, text) do
         Just(complaint) => ["${label} ${complaint}"]
         None => []

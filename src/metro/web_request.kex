@@ -7,7 +7,7 @@
 # further down is run — so a plug refuses a request by answering it.
 #
 #   foul show(request: WebRequest) -> WebRequest do
-#     let user : User = request.assigned(:user).try
+#     let Just(user) = request.assigned(:user)
 #     request.html(App.Views.Chat.page(user))
 #   end
 module Metro.WebRequest
@@ -109,8 +109,9 @@ make WebRequest do
 
   let assign(key: Atom, value: Any) -> WebRequest = WebRequest { ...this, assigns: @assigns.put(key, value) }
 
-  # What was assigned under a key. Annotate where it lands:
-  #   let user : User = request.assigned(:user).try
+  # What was assigned under a key, as an Any: bind it by its pattern where
+  # it must be there, and give it its type where it lands:
+  #   let Just(user) = request.assigned(:user)
   let assigned(key: Atom) -> Any? = @assigns.get(key)
 
   # --- The response -----------------------------------------------------------

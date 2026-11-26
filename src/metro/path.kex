@@ -44,7 +44,7 @@ end
 make Path do
   # The literal first segment, when this address owns a top-level path.
   # Dynamic roots such as `/:organization/...` have none.
-  let rootSegment -> String? = segments(@template).first.flatMap { |segment|
+  let rootSegment -> String? = segments(@template).first.into { |segment|
     segment.startsWith?(":") || segment.startsWith?("*") then None else Just(segment)
   }
 
